@@ -46,23 +46,33 @@ jobs:
 
       - name: Run tests
         shell: pwsh
+        env:
+          # The runner has no interactive desktop, so Qt Quick cannot make a
+          # real window; offscreen is the standard platform plugin for CI.
+          QT_QPA_PLATFORM: offscreen
         run: |
-          # debug_and_release means nmake may produce more than one binary;
-          # show what there is before picking, so a wrong pick is visible.
-          Get-ChildItem -Path 'build-tests','build-tests-picker' -Recurse -File -Filter '*_tests.exe' |
-            ForEach-Object { Write-Host "found: $($_.FullName)" }
-
           $failed = @()
           foreach ($dir in 'build-tests', 'build-tests-picker') {
             $exe = Get-ChildItem -Path $dir -Recurse -File -Filter '*_tests.exe' |
                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if (-not $exe) { throw "No test binary was built in $dir" }
             Write-Host "== $($exe.Name) =="
-            # -o -,txt forces plain text on stdout; merge stderr so a crash
-            # message is not swallowed.
-            & $exe.FullName -o '-,txt' -v1 2>&1 | ForEach-Object { Write-Host $_ }
-            Write-Host "$($exe.Name) exited with $LASTEXITCODE"
-            if ($LASTEXITCODE -ne 0) { $failed += "$($exe.Name) ($LASTEXITCODE)" }
+
+            # Capture through a file as well as the pipe: if the pipe stays
+            # empty and the file does not, the problem is the pipe.
+            $log = Join-Path $PWD "$($exe.BaseName)-out.txt"
+            cmd /c "`"$($exe.FullName)`" > `"$log`" 2>&1"
+            $code = $LASTEXITCODE
+            if (Test-Path $log) {
+              Write-Host "--- captured output ---"
+              Get-Content $log | ForEach-Object { Write-Host $_ }
+              Write-Host "--- end ($((Get-Item $log).Length) bytes) ---"
+            } else {
+              Write-Host "no output file was produced"
+            }
+
+            Write-Host "$($exe.Name) exited with $code"
+            if ($code -ne 0) { $failed += "$($exe.Name) ($code)" }
           }
           if ($failed.Count) { throw "Failing suites: $($failed -join ', ')" }
 
