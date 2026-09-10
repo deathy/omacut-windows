@@ -47,13 +47,20 @@ jobs:
       - name: Run tests
         shell: pwsh
         run: |
+          # debug_and_release means nmake may produce more than one binary;
+          # show what there is before picking, so a wrong pick is visible.
+          Get-ChildItem -Path 'build-tests','build-tests-picker' -Recurse -File -Filter '*_tests.exe' |
+            ForEach-Object { Write-Host "found: $($_.FullName)" }
+
           $failed = @()
           foreach ($dir in 'build-tests', 'build-tests-picker') {
             $exe = Get-ChildItem -Path $dir -Recurse -File -Filter '*_tests.exe' |
                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if (-not $exe) { throw "No test binary was built in $dir" }
             Write-Host "== $($exe.Name) =="
-            & $exe.FullName
+            # -o -,txt forces plain text on stdout; merge stderr so a crash
+            # message is not swallowed.
+            & $exe.FullName -o '-,txt' -v1 2>&1 | ForEach-Object { Write-Host $_ }
             Write-Host "$($exe.Name) exited with $LASTEXITCODE"
             if ($LASTEXITCODE -ne 0) { $failed += "$($exe.Name) ($LASTEXITCODE)" }
           }
