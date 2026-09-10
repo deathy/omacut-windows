@@ -98,7 +98,7 @@ jobs:
           Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest)
           and it merged cleanly onto our port.
 
-          The Build workflow runs on \`$branch\` and leaves an
+          Opening this runs the Build workflow, which leaves an
           \`omacut-win64\` artifact. Try it on Windows before merging -- a
           green build only proves that it compiles.
 
@@ -127,7 +127,9 @@ jobs:
           {
             echo "## Upstream $latest is merged and waiting"
             echo
-            echo "The branch \`$branch\` is pushed and building."
+            echo "The branch \`$branch\` is pushed. Opening the pull request"
+            echo "is what builds it -- GitHub raises no events for a push made"
+            echo "with GITHUB_TOKEN."
             echo
             echo "**[Open the pull request]($compare)**"
             echo

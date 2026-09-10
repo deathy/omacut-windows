@@ -2,8 +2,10 @@ name: Build
 
 on:
   push:
-    # sync/** so an upstream merge has a tested build waiting on it even when
-    # the sync workflow cannot open a pull request to carry one.
+    # sync/** covers a sync branch pushed by hand. A branch pushed by the
+    # sync workflow does not land here: GitHub does not raise events for
+    # pushes made with GITHUB_TOKEN. Opening the pull request is what builds
+    # those, via pull_request below.
     branches: [main, 'sync/**']
   pull_request:
   workflow_dispatch:
