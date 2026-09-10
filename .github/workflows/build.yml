@@ -62,12 +62,17 @@ jobs:
             if (-not $exe) { throw "No test binary was built in $dir" }
             Write-Host "== $($exe.Name) =="
 
-            # Let QtTest open and write the file itself. Its stdout comes out
-            # empty on this runner, whether piped or redirected by cmd, and its
-            # own file logger is a different path out.
+            # Run from the directory qmake ran in, the way upstream's bin/test
+            # does: qmake leaves __FILE__ relative in a shadow build, and the
+            # QML tests locate Main.qml relative to it.
             $log = Join-Path $PWD "$($exe.BaseName).txt"
-            & $exe.FullName -o "$log,txt"
-            $code = $LASTEXITCODE
+            Push-Location $dir
+            try {
+              # QtTest's stdout arrives empty on this runner however it is
+              # captured; its own file logger is a different path out.
+              & $exe.FullName -o "$log,txt"
+              $code = $LASTEXITCODE
+            } finally { Pop-Location }
 
             if (Test-Path $log) {
               Get-Content $log | ForEach-Object { Write-Host $_ }

@@ -62,11 +62,13 @@ jobs:
           if (-not $exe) { throw 'No test binary was built' }
           # QtTest's stdout arrives empty on the Windows runner; its own file
           # logger is the way to see results.
-          & $exe.FullName -o "$PWD\backend_tests.txt,txt"
-          $code = $LASTEXITCODE
-          if (Test-Path "$PWD\backend_tests.txt") {
-            Get-Content "$PWD\backend_tests.txt" | ForEach-Object { Write-Host $_ }
-          }
+          $log = Join-Path $PWD 'backend_tests.txt'
+          Push-Location build-tests
+          try {
+            & $exe.FullName -o "$log,txt"
+            $code = $LASTEXITCODE
+          } finally { Pop-Location }
+          if (Test-Path $log) { Get-Content $log | ForEach-Object { Write-Host $_ } }
           if ($code -ne 0) { throw 'Tests failed -- not releasing' }
 
       - name: Package

@@ -568,7 +568,12 @@ void BackendTests::exportStartFailureClearsBusy() {
     backend.exportClip(QUrl::fromLocalFile(m_dir.filePath(QStringLiteral("failed.mp4"))),
                        0.0, 1.0);
 
+#ifndef Q_OS_WIN
+    // Unix reports a failed exec asynchronously, so the export is briefly busy.
+    // CreateProcess fails inline instead, which means errorOccurred -- and the
+    // cleanup behind it -- has already run by the time exportClip() returns.
     QVERIFY(backend.busy());
+#endif
     QTRY_COMPARE_WITH_TIMEOUT(failedSpy.count(), 1, 5000);
     QVERIFY(!backend.busy());
     QVERIFY(backend.status().isEmpty());
