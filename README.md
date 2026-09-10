@@ -78,12 +78,12 @@ never publishes from one.
 A green build is not a working app. Every sync PR carries a built artifact that
 is meant to be run by a person on Windows before the PR is merged.
 
-A sync arrives as a pull request when GitHub permits one, and otherwise as an
-issue or — failing that too — as a deliberately failed run whose summary carries
-a compare link. To get real pull requests, turn on *Allow GitHub Actions to
-create and approve pull requests* under
-[Settings → Actions → General](../../settings/actions) and in your
-[account settings](https://github.com/settings/actions).
+A sync normally arrives as a pull request. That needs *Allow GitHub Actions to
+create and approve pull requests* under Settings → Actions → General, which is
+off by default on a new repository and is already on here. If it is ever turned
+off, the sync degrades rather than disappearing: it files an issue instead, and
+failing that marks its own run failed with a compare link in the summary, so
+the branch is never merged and forgotten.
 
 > GitHub disables scheduled workflows after 60 days without repository activity.
 > If syncs go quiet, re-enable it from the Actions tab.

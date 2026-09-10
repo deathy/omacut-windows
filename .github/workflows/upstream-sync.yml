@@ -109,14 +109,19 @@ jobs:
           # always have on a personal account, and neither is settable from the
           # repository API. The branch is pushed regardless, so degrade in
           # steps rather than lose the sync.
-          if gh pr create --base main --head "$branch" \
+          # --repo is not optional here: this checkout has an "upstream" remote,
+          # and gh resolves its target from the remotes, preferring a remote
+          # named upstream over origin. Without it, gh tries to open the pull
+          # request against upstream's repository instead of ours.
+          if gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
                --title "Sync with upstream $latest" --body-file /tmp/body.md; then
             echo "Opened a pull request for $branch"
             exit 0
           fi
 
           echo "Could not open a pull request; trying an issue"
-          if gh issue create --title "Sync with upstream $latest is ready" \
+          if gh issue create --repo "$GITHUB_REPOSITORY" \
+               --title "Sync with upstream $latest is ready" \
                --body-file /tmp/body.md; then
             echo "Filed an issue for $branch"
             exit 0
@@ -136,8 +141,7 @@ jobs:
             echo "This run is marked failed only because it could not open the"
             echo "pull request or issue itself -- the sync worked. To let it,"
             echo "turn on *Allow GitHub Actions to create and approve pull"
-            echo "requests* under Settings -> Actions -> General, for both the"
-            echo "account and the repository."
+            echo "requests* under Settings -> Actions -> General."
           } >> "$GITHUB_STEP_SUMMARY"
 
           echo "Upstream $latest merged onto $branch, but no PR or issue could be created."
@@ -169,6 +173,6 @@ jobs:
 
           Update \`UPSTREAM_VERSION\` to \`$latest\` as part of the fix.
           BODY
-          gh issue create \
+          gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "Upstream $latest conflicts with the Windows port" \
             --body-file /tmp/issue-body.md
