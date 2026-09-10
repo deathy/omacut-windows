@@ -2,7 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    # sync/** so an upstream merge has a tested build waiting on it even when
+    # the sync workflow cannot open a pull request to carry one.
+    branches: [main, 'sync/**']
   pull_request:
   workflow_dispatch:
 

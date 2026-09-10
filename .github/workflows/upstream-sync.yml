@@ -84,55 +84,63 @@ jobs:
             echo "conflict=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Open a pull request
+      - name: Announce the merged sync
         if: steps.merge.outputs.conflict == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           latest="${{ steps.check.outputs.latest }}"
           branch="sync/$latest"
-          cat > /tmp/pr-body.md <<BODY
+          compare="https://github.com/$GITHUB_REPOSITORY/compare/main...$branch?expand=1"
+
+          cat > /tmp/body.md <<BODY
           Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest)
           and it merged cleanly onto our port.
 
-          The Build workflow on this PR compiles it for Windows and runs the
-          test suite, but **nothing here has been run by a human on Windows**.
-          Download the \`omacut-win64\` artifact from the build and try it
-          before merging -- a green build only proves that it compiles.
+          The Build workflow runs on \`$branch\` and leaves an
+          \`omacut-win64\` artifact. Try it on Windows before merging -- a
+          green build only proves that it compiles.
 
           Merging this and tagging \`$latest\` publishes a Windows release.
           BODY
 
-          # Creating a pull request needs "Allow GitHub Actions to create and
-          # approve pull requests", which is off by default and, on a personal
-          # account, only settable in the web UI. The branch is pushed either
-          # way, so fall back to an issue rather than losing the sync.
+          # Both of these need permissions the default GITHUB_TOKEN does not
+          # always have on a personal account, and neither is settable from the
+          # repository API. The branch is pushed regardless, so degrade in
+          # steps rather than lose the sync.
           if gh pr create --base main --head "$branch" \
-               --title "Sync with upstream $latest" \
-               --body-file /tmp/pr-body.md
-          then
-            echo "opened a pull request for $branch"
-          else
-            echo "could not open a pull request; filing an issue instead"
-            compare="https://github.com/$GITHUB_REPOSITORY/compare/main...$branch?expand=1"
-            {
-              echo "Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest)"
-              echo "and it merged cleanly onto our port. The branch \`$branch\` is pushed."
-              echo
-              echo "**Open the pull request:** $compare"
-              echo
-              echo "A pull request could not be opened automatically. To let this"
-              echo "workflow do it next time, turn on *Allow GitHub Actions to create"
-              echo "and approve pull requests* under Settings -> Actions -> General."
-              echo
-              echo "Build the branch and try the \`omacut-win64\` artifact on Windows"
-              echo "before merging -- a green build only proves that it compiles."
-            } > /tmp/fallback.md
-            gh issue create \
-              --title "Sync with upstream $latest is ready to review" \
-              --body-file /tmp/fallback.md
+               --title "Sync with upstream $latest" --body-file /tmp/body.md; then
+            echo "Opened a pull request for $branch"
+            exit 0
           fi
+
+          echo "Could not open a pull request; trying an issue"
+          if gh issue create --title "Sync with upstream $latest is ready" \
+               --body-file /tmp/body.md; then
+            echo "Filed an issue for $branch"
+            exit 0
+          fi
+
+          # Nothing could be created, so make the run itself the notification:
+          # a failed run is emailed, and the summary says what to do about it.
+          {
+            echo "## Upstream $latest is merged and waiting"
+            echo
+            echo "The branch \`$branch\` is pushed and building."
+            echo
+            echo "**[Open the pull request]($compare)**"
+            echo
+            echo "This run is marked failed only because it could not open the"
+            echo "pull request or issue itself -- the sync worked. To let it,"
+            echo "turn on *Allow GitHub Actions to create and approve pull"
+            echo "requests* under Settings -> Actions -> General, for both the"
+            echo "account and the repository."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Upstream $latest merged onto $branch, but no PR or issue could be created."
+          echo "Open it here: $compare"
+          exit 1
 
       - name: File an issue when the merge conflicts
         if: steps.merge.outputs.conflict == 'true'
