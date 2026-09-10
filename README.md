@@ -64,6 +64,11 @@ brew install qtbase qtdeclarative qtmultimedia
 
 ## How releases track upstream
 
+Releases here are tagged `win-v0.4.0`, deliberately clear of upstream's own
+`v0.4.0` — this repository carries upstream's history, and therefore its tags.
+The version people see drops the prefix; a semver suffix (`win-v0.4.0-alpha.1`)
+publishes as a pre-release.
+
 `UPSTREAM_VERSION` records the upstream tag this port is built from. A daily
 [workflow](.github/workflows/upstream-sync.yml) checks for a newer upstream
 release and, when it finds one, merges it and opens a pull request. If the merge
@@ -72,6 +77,13 @@ never publishes from one.
 
 A green build is not a working app. Every sync PR carries a built artifact that
 is meant to be run by a person on Windows before the PR is merged.
+
+A sync arrives as a pull request when GitHub permits one, and otherwise as an
+issue or — failing that too — as a deliberately failed run whose summary carries
+a compare link. To get real pull requests, turn on *Allow GitHub Actions to
+create and approve pull requests* under
+[Settings → Actions → General](../../settings/actions) and in your
+[account settings](https://github.com/settings/actions).
 
 > GitHub disables scheduled workflows after 60 days without repository activity.
 > If syncs go quiet, re-enable it from the Actions tab.
