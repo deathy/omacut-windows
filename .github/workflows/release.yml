@@ -37,14 +37,14 @@ jobs:
         shell: cmd
         run: |
           mkdir build && cd build
-          qmake ..\omacut.pro || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\omacut.pro" || exit /b 1
           nmake || exit /b 1
 
       - name: Build and run tests
         shell: cmd
         run: |
           mkdir build-tests && cd build-tests
-          qmake ..\tests\backend_tests.pro || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\tests\backend_tests.pro" || exit /b 1
           nmake || exit /b 1
 
       - name: Install ffmpeg for the test run
@@ -53,13 +53,21 @@ jobs:
 
       - name: Run tests
         shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           # Never publish a release whose own test suite does not pass.
           $exe = Get-ChildItem -Path build-tests -Recurse -File -Filter 'backend_tests.exe' |
                  Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $exe) { throw 'No test binary was built' }
-          & $exe.FullName
-          if ($LASTEXITCODE -ne 0) { throw 'Tests failed -- not releasing' }
+          # QtTest's stdout arrives empty on the Windows runner; its own file
+          # logger is the way to see results.
+          & $exe.FullName -o "$PWD\backend_tests.txt,txt"
+          $code = $LASTEXITCODE
+          if (Test-Path "$PWD\backend_tests.txt") {
+            Get-Content "$PWD\backend_tests.txt" | ForEach-Object { Write-Host $_ }
+          }
+          if ($code -ne 0) { throw 'Tests failed -- not releasing' }
 
       - name: Package
         shell: pwsh

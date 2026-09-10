@@ -23,18 +23,22 @@ jobs:
         shell: cmd
         run: |
           mkdir build && cd build
-          qmake ..\omacut.pro || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\omacut.pro" || exit /b 1
           nmake || exit /b 1
 
+      # Absolute .pro paths, so __FILE__ comes out absolute in the binary --
+      # the QML tests locate Main.qml relative to it, and a relative path there
+      # resolves against the working directory instead. This is what upstream's
+      # own bin/test does.
       - name: Build tests
         shell: cmd
         run: |
           mkdir build-tests && cd build-tests
-          qmake ..\tests\backend_tests.pro || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\tests\backend_tests.pro" || exit /b 1
           nmake || exit /b 1
           cd ..
           mkdir build-tests-picker && cd build-tests-picker
-          qmake ..\tests\dialogfilepicker_tests.pro || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\tests\dialogfilepicker_tests.pro" || exit /b 1
           nmake || exit /b 1
 
       - name: Install ffmpeg for the test run
