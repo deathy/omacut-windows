@@ -15,13 +15,14 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-windows-build
 
       - name: Build omacut
         shell: cmd
         run: |
+          call "%VCVARS%" || exit /b 1
           mkdir build && cd build
           qmake "%GITHUB_WORKSPACE%\omacut.pro" || exit /b 1
           nmake || exit /b 1
@@ -33,6 +34,7 @@ jobs:
       - name: Build tests
         shell: cmd
         run: |
+          call "%VCVARS%" || exit /b 1
           mkdir build-tests && cd build-tests
           qmake "%GITHUB_WORKSPACE%\tests\backend_tests.pro" || exit /b 1
           nmake || exit /b 1
@@ -89,7 +91,7 @@ jobs:
         run: ./bin/package-windows.ps1 -Version "ci-$($env:GITHUB_SHA.Substring(0,7))"
 
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: omacut-win64
           path: dist/*.zip

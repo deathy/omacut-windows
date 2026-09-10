@@ -1,5 +1,5 @@
 name: Set up Windows build
-description: Installs the Qt version omacut builds against, plus the MSVC toolchain.
+description: Installs the Qt version omacut builds against, and locates the MSVC toolchain.
 
 inputs:
   qt-version:
@@ -22,7 +22,17 @@ runs:
         modules: qtmultimedia
         cache: true
 
-    - name: Set up MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+    # Rather than a third-party action -- the usual one is still on Node 20,
+    # with no Node 24 release to move to -- find vcvars64.bat and let each
+    # build step call it. Environment set by a `call` does not survive the
+    # step, so the path is exported and the callers do the rest.
+    - name: Locate MSVC
+      shell: cmd
+      run: |
+        set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+        if not exist "%VSWHERE%" ( echo vswhere.exe not found & exit /b 1 )
+        for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
+        if not defined VSPATH ( echo No MSVC toolchain found & exit /b 1 )
+        if not exist "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" ( echo vcvars64.bat not found under "%VSPATH%" & exit /b 1 )
+        echo Found MSVC at %VSPATH%
+        echo VCVARS=%VSPATH%\VC\Auxiliary\Build\vcvars64.bat>>"%GITHUB_ENV%"
