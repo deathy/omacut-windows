@@ -54,7 +54,8 @@ jobs:
             if (-not $exe) { throw "No test binary was built in $dir" }
             Write-Host "== $($exe.Name) =="
             & $exe.FullName
-            if ($LASTEXITCODE -ne 0) { $failed += $exe.Name }
+            Write-Host "$($exe.Name) exited with $LASTEXITCODE"
+            if ($LASTEXITCODE -ne 0) { $failed += "$($exe.Name) ($LASTEXITCODE)" }
           }
           if ($failed.Count) { throw "Failing suites: $($failed -join ', ')" }
 
