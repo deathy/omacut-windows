@@ -58,19 +58,18 @@ jobs:
             if (-not $exe) { throw "No test binary was built in $dir" }
             Write-Host "== $($exe.Name) =="
 
-            # Capture through a file as well as the pipe: if the pipe stays
-            # empty and the file does not, the problem is the pipe.
-            $log = Join-Path $PWD "$($exe.BaseName)-out.txt"
-            cmd /c "`"$($exe.FullName)`" > `"$log`" 2>&1"
+            # Let QtTest open and write the file itself. Its stdout comes out
+            # empty on this runner, whether piped or redirected by cmd, and its
+            # own file logger is a different path out.
+            $log = Join-Path $PWD "$($exe.BaseName).txt"
+            & $exe.FullName -o "$log,txt"
             $code = $LASTEXITCODE
-            if (Test-Path $log) {
-              Write-Host "--- captured output ---"
-              Get-Content $log | ForEach-Object { Write-Host $_ }
-              Write-Host "--- end ($((Get-Item $log).Length) bytes) ---"
-            } else {
-              Write-Host "no output file was produced"
-            }
 
+            if (Test-Path $log) {
+              Get-Content $log | ForEach-Object { Write-Host $_ }
+            } else {
+              Write-Host "QtTest wrote no log file either"
+            }
             Write-Host "$($exe.Name) exited with $code"
             if ($code -ne 0) { $failed += "$($exe.Name) ($code)" }
           }
