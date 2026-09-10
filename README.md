@@ -1,65 +1,87 @@
-# Omacut
+# omacut for Windows
 
-A dead-simple video **length** trimmer. Open a video, drag the two yellow handles to pick a start and end, preview the clip, and export.
+An **unofficial Windows build** of [omacut](https://github.com/omacom/omacut) —
+David Heinemeier Hansson's dead-simple video length trimmer. Open a video, drag
+two handles to pick a start and an end, preview, export.
 
-Built using **Qt Quick (QML)** UI with the Material style — the same Qt stack Quickshell builds on — and **ffmpeg** for the cut. The C++ side compiles to a single executable; the QML is embedded in it via Qt resources.
-
-<img width="3227" height="3227" alt="screenshot-2026-06-23_15-20-40" src="https://github.com/user-attachments/assets/c76047c8-618f-4c1c-91f9-e7024c4f953b" />
-
-## Hotkeys
-
-- *Escape*: Open a new file to trim.
-- *Space*: Start/stop video playback.
-- *Left/Right*: Move the playhead by 5 seconds.
-- *Alt+Left/Right*: Move the playhead by 1 second.
-- *Shift+Left/Right*: Move the start of the trim by 5 seconds.
-- *Ctrl+Left/Right*: Move the end of the trim by 5 seconds.
-- *Alt+Space*: Move the start of the trim to the playhead.
-- *Return*: Export the current trim.
-- *Keypad Enter*: Export the current trim.
+This repository is a thin port. Nearly all of the code is upstream's; what is
+added here is a file picker for platforms with no desktop portal, a Windows-safe
+file replace, and the packaging to ship it. All credit for omacut goes upstream.
 
 ## Install
 
-Install via the Omarchy Package Repository via the `omacut` package. It's installed by default in new installations of Omarchy (from Quattro forward).
+Download the latest `omacut-*-win64.zip` from
+[Releases](../../releases), unpack it anywhere, and run `omacut.exe`.
 
-## Requirements
+ffmpeg is bundled — there is nothing else to install.
 
-- `xdg-desktop-portal` and a portal backend for the file picker
-- `ffmpeg` and `ffprobe` on your PATH (used at runtime)
+> **SmartScreen will warn you on first run.** These builds are not code-signed
+> (a certificate is a few hundred dollars a year). Choose *More info* →
+> *Run anyway*. If you would rather not, build it yourself — see below.
 
-Exports are always written as MP4 files, regardless of the input video's container.
+## Hotkeys
 
-## Build
+- *Space*: start/stop playback
+- *Left/Right*: move the playhead by 1 second
+- *Shift+Left/Right*: by 5 seconds; *Alt+Left/Right*: by 0.2 seconds
+- *Ctrl+Space* / *Alt+Space*: set the start / end of the trim to the playhead
+- *Z*: zoom into the selection for fine tuning
+- *Ctrl+O*: open a file · *Ctrl+S*: export · *Q*: quit · *?*: show hotkeys
 
-Uses Qt's own build tool, `qmake6` (no cmake needed):
+## How this differs from upstream
 
-```bash
-./bin/build
+| | Upstream (Linux) | This build |
+|---|---|---|
+| File dialogs | xdg-desktop-portal over D-Bus | native Windows dialogs |
+| Export quality | a "Quality" combo in the portal dialog | folded into the "Save as type" combo |
+| Accent colour | follows your Omarchy theme | upstream's default amber |
+| ffmpeg | a package dependency | bundled in the zip |
+
+The accent difference is not a port decision — upstream already falls back to its
+default when there is no Omarchy theme to read, which is every non-Omarchy
+machine.
+
+## Building it yourself
+
+You need [Qt 6](https://www.qt.io/download-qt-installer) (with the Qt Multimedia
+module) and MSVC. From an *x64 Native Tools Command Prompt for VS*:
+
+```powershell
+pwsh -File bin\build-windows.ps1 -QtDir C:\Qt\6.8.1\msvc2022_64
 ```
 
-This produces a single `omacut` binary in `build/`.
+That builds, gathers the Qt runtime, downloads ffmpeg, and leaves a runnable
+folder in `build\omacut-local-win64\`. Pass `-SkipFfmpeg` if you already have
+ffmpeg on your `PATH`.
 
-Requirements:
+The port also builds and runs on macOS, which is how it gets tested without a
+Windows machine in the loop:
 
-- A C++17 compiler and Qt6: `qt6-base`, `qt6-declarative` (Qt Quick + Controls),
-  `qt6-multimedia`
-
-## Test
-
-```bash
-./bin/test
+```sh
+brew install qtbase qtdeclarative qtmultimedia
+./bin/build            # upstream's own build script
 ```
 
-## Package
+## How releases track upstream
 
-Build and install the local Arch package:
+`UPSTREAM_VERSION` records the upstream tag this port is built from. A daily
+[workflow](.github/workflows/upstream-sync.yml) checks for a newer upstream
+release and, when it finds one, merges it and opens a pull request. If the merge
+conflicts it opens an issue instead — it never resolves a conflict on its own and
+never publishes from one.
 
-```bash
-./bin/install
-```
+A green build is not a working app. Every sync PR carries a built artifact that
+is meant to be run by a person on Windows before the PR is merged.
 
-This runs `./bin/build`, then `makepkg -fsi` from `pkgbuild/` so same-version local packages are rebuilt and reinstalled. Extra arguments are passed through to `makepkg`, for example `./bin/install --clean`. The package installs the binary, desktop entry, app icon, and MIT license. Local package outputs such as `pkgbuild/pkg/`, `pkgbuild/src/`, and `*.pkg.tar.*` are ignored.
+> GitHub disables scheduled workflows after 60 days without repository activity.
+> If syncs go quiet, re-enable it from the Actions tab.
 
-## License
+## Licence
 
-MIT. See `LICENSE`.
+omacut is MIT, Copyright (c) 2026 David Heinemeier Hansson — see
+[LICENSE](LICENSE). The changes in this repository are offered under the same
+terms.
+
+Released archives bundle Qt (LGPL v3) and a GPL build of ffmpeg. What that
+obliges and how to replace either is spelled out in
+[THIRD-PARTY.md](THIRD-PARTY.md), which ships inside every zip.

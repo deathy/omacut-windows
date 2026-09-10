@@ -1,0 +1,28 @@
+name: Set up Windows build
+description: Installs the Qt version omacut builds against, plus the MSVC toolchain.
+
+inputs:
+  qt-version:
+    description: Qt version to install
+    required: false
+    default: '6.8.1'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: ${{ inputs.qt-version }}
+        host: windows
+        target: desktop
+        arch: win64_msvc2022_64
+        # qtmultimedia is an add-on. qtbase and qtdeclarative come with the
+        # base install, and Qt Quick Controls rides along with qtdeclarative.
+        modules: qtmultimedia
+        cache: true
+
+    - name: Set up MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64

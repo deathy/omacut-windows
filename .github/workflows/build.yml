@@ -1,0 +1,70 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes an in-flight build irrelevant.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-windows-build
+
+      - name: Build omacut
+        shell: cmd
+        run: |
+          mkdir build && cd build
+          qmake ..\omacut.pro || exit /b 1
+          nmake || exit /b 1
+
+      - name: Build tests
+        shell: cmd
+        run: |
+          mkdir build-tests && cd build-tests
+          qmake ..\tests\backend_tests.pro || exit /b 1
+          nmake || exit /b 1
+          cd ..
+          mkdir build-tests-picker && cd build-tests-picker
+          qmake ..\tests\dialogfilepicker_tests.pro || exit /b 1
+          nmake || exit /b 1
+
+      - name: Install ffmpeg for the test run
+        shell: pwsh
+        run: |
+          # The backend tests shell out to a real ffmpeg to cut real files.
+          choco install ffmpeg --no-progress -y
+          ffmpeg -version
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          $failed = @()
+          foreach ($dir in 'build-tests', 'build-tests-picker') {
+            $exe = Get-ChildItem -Path $dir -Recurse -File -Filter '*_tests.exe' |
+                   Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if (-not $exe) { throw "No test binary was built in $dir" }
+            Write-Host "== $($exe.Name) =="
+            & $exe.FullName
+            if ($LASTEXITCODE -ne 0) { $failed += $exe.Name }
+          }
+          if ($failed.Count) { throw "Failing suites: $($failed -join ', ')" }
+
+      - name: Package
+        shell: pwsh
+        run: ./bin/package-windows.ps1 -Version "ci-$($env:GITHUB_SHA.Substring(0,7))"
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: omacut-win64
+          path: dist/*.zip
+          if-no-files-found: error

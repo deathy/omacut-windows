@@ -1,0 +1,4 @@
+# This README describes the Windows port, not upstream's Linux app, so an
+# upstream rewrite of it should never land here. The sync workflow enables the
+# "ours" driver; see .github/workflows/upstream-sync.yml.
+README.md merge=ours

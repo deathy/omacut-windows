@@ -32,4 +32,11 @@ linux {
     SOURCES += src/dialogfilepicker.cpp
 }
 
+win32 {
+    exists($$PWD/pkgbuild/omacut.ico): RC_ICONS = $$PWD/pkgbuild/omacut.ico
+    QMAKE_TARGET_PRODUCT = omacut
+    QMAKE_TARGET_DESCRIPTION = Dead-simple video length trimmer
+    QMAKE_TARGET_COPYRIGHT = MIT
+}
+
 RESOURCES += src/resources.qrc

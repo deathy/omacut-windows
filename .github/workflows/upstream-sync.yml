@@ -1,0 +1,138 @@
+name: Upstream sync
+
+on:
+  schedule:
+    # Daily. Upstream releases every few weeks, so this is mostly a no-op.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  UPSTREAM: omacom/omacut
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare our base against the newest upstream release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest=$(gh release view --repo "$UPSTREAM" --json tagName --jq .tagName)
+          current=$(tr -d '[:space:]' < UPSTREAM_VERSION)
+          echo "upstream latest: $latest"
+          echo "we are on:       $current"
+          echo "latest=$latest"   >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          if [ "$latest" = "$current" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true"  >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip when a sync for this tag is already open
+        id: existing
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="sync/${{ steps.check.outputs.latest }}"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "branch $branch already exists"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge the new upstream tag
+        id: merge
+        if: steps.check.outputs.changed == 'true' && steps.existing.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          latest="${{ steps.check.outputs.latest }}"
+          # .gitattributes marks README.md merge=ours; the driver has to be
+          # switched on per-clone for that to take effect.
+          git config merge.ours.driver true
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --tags upstream
+
+          git checkout -b "sync/$latest"
+
+          # A conflict here means our port touches something upstream just
+          # changed. That needs a human -- resolving it unattended and shipping
+          # the result is exactly how a port silently breaks.
+          if git merge --no-edit "$latest"; then
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "$latest" > UPSTREAM_VERSION
+            git commit -am "Track upstream $latest"
+            git push origin "sync/$latest"
+          else
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open a pull request
+        if: steps.merge.outputs.conflict == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest="${{ steps.check.outputs.latest }}"
+          cat > /tmp/pr-body.md <<BODY
+          Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest)
+          and it merged cleanly onto our port.
+
+          The Build workflow on this PR compiles it for Windows and runs the
+          test suite, but **nothing here has been run by a human on Windows**.
+          Download the \`omacut-win64\` artifact from the build and try it
+          before merging -- a green build only proves that it compiles.
+
+          Merging this and tagging \`$latest\` publishes a Windows release.
+          BODY
+          gh pr create \
+            --base main \
+            --head "sync/$latest" \
+            --title "Sync with upstream $latest" \
+            --body-file /tmp/pr-body.md
+
+      - name: File an issue when the merge conflicts
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest="${{ steps.check.outputs.latest }}"
+          cat > /tmp/issue-body.md <<BODY
+          Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest),
+          but merging it onto \`main\` hit conflicts, so it needs resolving by hand:
+
+          \`\`\`
+          git remote add upstream https://github.com/$UPSTREAM.git   # once
+          git fetch --tags upstream
+          git checkout -b sync/$latest main
+          git merge $latest
+          \`\`\`
+
+          This port deliberately keeps its diff tiny -- a file picker, a
+          Windows-safe rename, and an ffmpeg lookup -- so a conflict most
+          likely means upstream changed \`backend.cpp\`, \`ffmpeg.cpp\`,
+          \`main.cpp\` or one of the \`.pro\` files.
+
+          Update \`UPSTREAM_VERSION\` to \`$latest\` as part of the fix.
+          BODY
+          gh issue create \
+            --title "Upstream $latest conflicts with the Windows port" \
+            --body-file /tmp/issue-body.md

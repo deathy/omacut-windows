@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. v0.4.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-windows-build
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          $v = if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $env:GITHUB_REF -replace '^refs/tags/', ''
+          } else {
+            '${{ github.event.inputs.version }}'
+          }
+          if (-not $v) { throw 'No version to build' }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Building $v"
+
+      - name: Build omacut
+        shell: cmd
+        run: |
+          mkdir build && cd build
+          qmake ..\omacut.pro || exit /b 1
+          nmake || exit /b 1
+
+      - name: Build and run tests
+        shell: cmd
+        run: |
+          mkdir build-tests && cd build-tests
+          qmake ..\tests\backend_tests.pro || exit /b 1
+          nmake || exit /b 1
+
+      - name: Install ffmpeg for the test run
+        shell: pwsh
+        run: choco install ffmpeg --no-progress -y
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          # Never publish a release whose own test suite does not pass.
+          $exe = Get-ChildItem -Path build-tests -Recurse -File -Filter 'backend_tests.exe' |
+                 Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $exe) { throw 'No test binary was built' }
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed -- not releasing' }
+
+      - name: Package
+        shell: pwsh
+        run: ./bin/package-windows.ps1 -Version '${{ steps.version.outputs.version }}'
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: omacut ${{ steps.version.outputs.version }} for Windows
+          files: dist/*.zip
+          generate_release_notes: true
+          body: |
+            Unofficial Windows build of [omacut](https://github.com/omacom/omacut)
+            ${{ steps.version.outputs.version }}.
+
+            **Install:** download the zip, unpack it anywhere, run `omacut.exe`.
+            ffmpeg is bundled -- there is nothing else to install.
+
+            Windows SmartScreen will warn on first run, because these builds are
+            not code-signed. "More info" then "Run anyway".
+
+            omacut is MIT, by David Heinemeier Hansson. The bundled ffmpeg is a
+            GPL build; see `THIRD-PARTY.md` and `FFMPEG-LICENSE.txt` in the zip.
