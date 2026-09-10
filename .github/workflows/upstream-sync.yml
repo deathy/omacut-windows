@@ -91,6 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           latest="${{ steps.check.outputs.latest }}"
+          branch="sync/$latest"
           cat > /tmp/pr-body.md <<BODY
           Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest)
           and it merged cleanly onto our port.
@@ -102,11 +103,36 @@ jobs:
 
           Merging this and tagging \`$latest\` publishes a Windows release.
           BODY
-          gh pr create \
-            --base main \
-            --head "sync/$latest" \
-            --title "Sync with upstream $latest" \
-            --body-file /tmp/pr-body.md
+
+          # Creating a pull request needs "Allow GitHub Actions to create and
+          # approve pull requests", which is off by default and, on a personal
+          # account, only settable in the web UI. The branch is pushed either
+          # way, so fall back to an issue rather than losing the sync.
+          if gh pr create --base main --head "$branch" \
+               --title "Sync with upstream $latest" \
+               --body-file /tmp/pr-body.md
+          then
+            echo "opened a pull request for $branch"
+          else
+            echo "could not open a pull request; filing an issue instead"
+            compare="https://github.com/$GITHUB_REPOSITORY/compare/main...$branch?expand=1"
+            {
+              echo "Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest)"
+              echo "and it merged cleanly onto our port. The branch \`$branch\` is pushed."
+              echo
+              echo "**Open the pull request:** $compare"
+              echo
+              echo "A pull request could not be opened automatically. To let this"
+              echo "workflow do it next time, turn on *Allow GitHub Actions to create"
+              echo "and approve pull requests* under Settings -> Actions -> General."
+              echo
+              echo "Build the branch and try the \`omacut-win64\` artifact on Windows"
+              echo "before merging -- a green build only proves that it compiles."
+            } > /tmp/fallback.md
+            gh issue create \
+              --title "Sync with upstream $latest is ready to review" \
+              --body-file /tmp/fallback.md
+          fi
 
       - name: File an issue when the merge conflicts
         if: steps.merge.outputs.conflict == 'true'
