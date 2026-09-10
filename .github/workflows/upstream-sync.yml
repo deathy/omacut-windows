@@ -102,7 +102,8 @@ jobs:
           \`omacut-win64\` artifact. Try it on Windows before merging -- a
           green build only proves that it compiles.
 
-          Merging this and tagging \`$latest\` publishes a Windows release.
+          Merging this and tagging \`win-$latest\` publishes a Windows release
+          (release tags are namespaced to stay clear of upstream's own).
           BODY
 
           # Both of these need permissions the default GITHUB_TOKEN does not
