@@ -50,8 +50,29 @@ Get-ChildItem -Path (Join-Path $root 'licenses') -File |
 $windeployqt = Get-Command 'windeployqt' -ErrorAction SilentlyContinue
 if (-not $windeployqt) { throw "windeployqt was not found on the PATH" }
 & $windeployqt.Source --release --qmldir (Join-Path $root 'src') `
-    --no-translations --no-system-d3d-compiler (Join-Path $stage 'omacut.exe')
+    --no-translations --no-system-d3d-compiler --no-compiler-runtime `
+    (Join-Path $stage 'omacut.exe')
 if ($LASTEXITCODE -ne 0) { throw "windeployqt failed ($LASTEXITCODE)" }
+
+# omacut is built with MSVC, so it needs the Visual C++ runtime. windeployqt
+# would drop in vc_redist.x64.exe -- 25 MB of installer the user still has to
+# run by hand. Copying the DLLs themselves is ~600 KB and just works.
+$redistRoot = $env:VCToolsRedistDir
+if ($redistRoot -and (Test-Path $redistRoot)) {
+    $crt = Get-ChildItem -Path (Join-Path $redistRoot 'x64') -Directory -Filter 'Microsoft.VC*.CRT' `
+             -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($crt) {
+        Get-ChildItem -Path $crt.FullName -File -Filter '*.dll' |
+            ForEach-Object {
+                Copy-Item $_.FullName -Destination $stage -Force
+                Write-Host "  runtime: $($_.Name)"
+            }
+    } else {
+        Write-Warning "No Microsoft.VC*.CRT folder under $redistRoot"
+    }
+} else {
+    Write-Warning 'VCToolsRedistDir is not set; the VC++ runtime will not be bundled.'
+}
 
 if (-not $SkipFfmpeg) {
     & (Join-Path $PSScriptRoot 'fetch-ffmpeg.ps1') -Destination $stage
@@ -61,6 +82,13 @@ if (-not $SkipFfmpeg) {
 foreach ($required in @('omacut.exe', 'Qt6Core.dll', 'Qt6Quick.dll', 'Qt6Multimedia.dll',
                         'LICENSE.txt', 'THIRD-PARTY.md', 'LGPL-3.0.txt', 'GPL-3.0.txt')) {
     if (-not (Test-Path (Join-Path $stage $required))) { throw "Missing $required in the staged folder" }
+}
+if ($redistRoot) {
+    # Without these the executable will not start on a machine that has no
+    # Visual C++ runtime installed, and the failure gives the user nothing.
+    foreach ($required in @('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {
+        if (-not (Test-Path (Join-Path $stage $required))) { throw "Missing $required in the staged folder" }
+    }
 }
 if (-not $SkipFfmpeg) {
     foreach ($required in @('ffmpeg.exe', 'ffprobe.exe', 'FFMPEG-LICENSE.txt')) {

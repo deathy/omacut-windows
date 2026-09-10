@@ -86,9 +86,14 @@ jobs:
           }
           if ($failed.Count) { throw "Failing suites: $($failed -join ', ')" }
 
+      # Through cmd so vcvars is in scope: packaging copies the Visual C++
+      # runtime, and only the MSVC environment says where it lives.
       - name: Package
-        shell: pwsh
-        run: ./bin/package-windows.ps1 -Version "ci-$($env:GITHUB_SHA.Substring(0,7))"
+        shell: cmd
+        run: |
+          call "%VCVARS%" || exit /b 1
+          set SHA=%GITHUB_SHA%
+          pwsh -File bin/package-windows.ps1 -Version "ci-%SHA:~0,7%" || exit /b 1
 
       - name: Upload build
         uses: actions/upload-artifact@v7

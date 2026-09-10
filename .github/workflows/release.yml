@@ -83,9 +83,13 @@ jobs:
           if (Test-Path $log) { Get-Content $log | ForEach-Object { Write-Host $_ } }
           if ($code -ne 0) { throw 'Tests failed -- not releasing' }
 
+      # Through cmd so vcvars is in scope: packaging copies the Visual C++
+      # runtime, and only the MSVC environment says where it lives.
       - name: Package
-        shell: pwsh
-        run: ./bin/package-windows.ps1 -Version '${{ steps.version.outputs.version }}'
+        shell: cmd
+        run: |
+          call "%VCVARS%" || exit /b 1
+          pwsh -File bin/package-windows.ps1 -Version "${{ steps.version.outputs.version }}" || exit /b 1
 
       - name: Publish release
         uses: softprops/action-gh-release@v3

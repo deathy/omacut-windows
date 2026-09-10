@@ -17,6 +17,17 @@ against your own Qt with `bin\build-windows.ps1`.
 - Qt source: <https://download.qt.io/official_releases/qt/>
 - The exact version this build used is recorded in the release notes.
 
+## Microsoft Visual C++ runtime
+
+`msvcp140.dll`, `vcruntime140*.dll` and their siblings are the Visual C++
+runtime that an MSVC-built program needs in order to start. They are
+redistributable under the Visual Studio licence, and are included so the zip
+runs on a machine that has never had Visual Studio or the redistributable
+installed.
+
+They are Microsoft's, unmodified. To use your own copy instead, delete them and
+install the [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe).
+
 ## ffmpeg — GPL v3
 
 `ffmpeg.exe`, `ffprobe.exe` and their `av*.dll` / `sw*.dll` files are a **GPL**
