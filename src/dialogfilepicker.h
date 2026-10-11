@@ -13,8 +13,7 @@ public:
     explicit DialogFilePicker(QObject *parent = nullptr);
 
     void openVideo() override;
-    void exportVideo(const QUrl &suggestedUrl, double start, double end,
-                     const QList<int> &scaleHeights) override;
+    void exportVideo(const QUrl &suggestedUrl, const QList<int> &scaleHeights) override;
 
     // The "Save as type" entries offered for scaleHeights, and the downscale a
     // chosen entry maps back to. Exposed so the tests can check the pairing

@@ -54,8 +54,7 @@ void DialogFilePicker::openVideo() {
     emit openSelected(QUrl::fromLocalFile(path));
 }
 
-void DialogFilePicker::exportVideo(const QUrl &suggestedUrl, double start, double end,
-                                   const QList<int> &scaleHeights) {
+void DialogFilePicker::exportVideo(const QUrl &suggestedUrl, const QList<int> &scaleHeights) {
     const QFileInfo target(suggestedUrl.toLocalFile());
     const QStringList filters = exportFilters(scaleHeights);
     QString selected = filters.first();
@@ -70,6 +69,6 @@ void DialogFilePicker::exportVideo(const QUrl &suggestedUrl, double start, doubl
     // Deliberately not forcing a .mp4 suffix here: Backend does that, and it
     // refuses when the rewrite lands on a file the dialog never offered to
     // overwrite. Appending it here would make that check a no-op.
-    emit exportSelected(QUrl::fromLocalFile(path), start, end,
+    emit exportSelected(QUrl::fromLocalFile(path),
                         scaleHeightForFilter(selected, filters, scaleHeights));
 }
