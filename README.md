@@ -1,8 +1,8 @@
 # omacut for Windows
 
 An **unofficial Windows build** of [omacut](https://github.com/omacom/omacut) —
-David Heinemeier Hansson's dead-simple video length trimmer. Open a video, drag
-two handles to pick a start and an end, preview, export.
+David Heinemeier Hansson's dead-simple video trimmer. Open a video, trim either
+end, split it into clips and cut ranges out of the middle, preview, export.
 
 This repository is a thin port. Nearly all of the code is upstream's; what is
 added here is a file picker for platforms with no desktop portal, a Windows-safe
@@ -24,8 +24,13 @@ ffmpeg is bundled — there is nothing else to install.
 - *Space*: start/stop playback
 - *Left/Right*: move the playhead by 1 second
 - *Shift+Left/Right*: by 5 seconds; *Alt+Left/Right*: by 0.2 seconds
-- *Ctrl+Space* / *Alt+Space*: set the start / end of the trim to the playhead
-- *Z*: zoom into the selection for fine tuning
+- *[ / ]*: jump to the previous / next clip edge
+- *S*: split the clip at the playhead
+- *X*, *Delete*: remove the clip under the playhead; in a gap, restore it
+- *Ctrl+Space* / *Alt+Space*: move the start / end of the clip under the
+  playhead to the playhead
+- *Ctrl+Z* / *Ctrl+Shift+Z*: undo / redo
+- *Z*: zoom to the clip under the playhead for fine tuning
 - *Ctrl+O*: open a file · *Ctrl+S*: export · *Q*: quit · *?*: show hotkeys
 
 ## How this differs from upstream

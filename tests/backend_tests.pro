@@ -12,16 +12,20 @@ INCLUDEPATH += ../src
 
 HEADERS += \
     ../src/backend.h \
+    ../src/edit.h \
     ../src/ffmpeg.h \
     ../src/filepicker.h \
     ../src/thumbprovider.h \
+    ../src/timeline.h \
     ../src/thumbworker.h
 
 SOURCES += \
     backend_tests.cpp \
     ../src/backend.cpp \
+    ../src/edit.cpp \
     ../src/ffmpeg.cpp \
     ../src/thumbprovider.cpp \
+    ../src/timeline.cpp \
     ../src/thumbworker.cpp
 
 # Match omacut.pro: the picker implementation is platform-bound.

@@ -6,16 +6,20 @@ TEMPLATE = app
 
 HEADERS += \
     src/filepicker.h \
+    src/edit.h \
     src/ffmpeg.h \
     src/thumbworker.h \
     src/thumbprovider.h \
+    src/timeline.h \
     src/backend.h
 
 SOURCES += \
     src/main.cpp \
+    src/edit.cpp \
     src/ffmpeg.cpp \
     src/thumbworker.cpp \
     src/thumbprovider.cpp \
+    src/timeline.cpp \
     src/backend.cpp
 
 # The file picker is the one genuinely platform-bound piece. Linux asks

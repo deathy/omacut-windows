@@ -12,15 +12,19 @@
     defaults together -- the hash is what makes the download verifiable, so
     never bump the tag alone.
 
+    Pin a month-end build only. BtbN keeps the last build of each month for two
+    years but prunes dailies after fourteen days, and a pruned pin is a 404 that
+    breaks packaging -- and leaves FFMPEG-BUILD.txt naming a build that is gone.
+
     Source: https://github.com/BtbN/FFmpeg-Builds (GPL, because omacut encodes
     with libx264). See THIRD-PARTY.md for what that obliges us to ship.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Destination,
-    [string]$Tag    = 'autobuild-2026-09-09-14-51',
-    [string]$Asset  = 'ffmpeg-n9.0.1-27-g9b0578816c-win64-gpl-shared-9.0.zip',
-    [string]$Sha256 = '26add2aceeba58279024dcb658bc6fd1a7f2c3914a89c5ca70e2d2784f34df57',
+    [string]$Tag    = 'autobuild-2026-09-30-13-08',
+    [string]$Asset  = 'ffmpeg-n9.0.2-17-g2a571b6068-win64-gpl-shared-9.0.zip',
+    [string]$Sha256 = '3da6c7b60bb9ccd73ec5b5e815ba804a0879eb362ba0e3beebce50174c022696',
     [string]$CacheDir = (Join-Path ([System.IO.Path]::GetTempPath()) 'omacut-ffmpeg-cache')
 )
 
