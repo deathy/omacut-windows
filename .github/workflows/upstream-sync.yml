@@ -156,6 +156,18 @@ jobs:
         run: |
           set -euo pipefail
           latest="${{ steps.check.outputs.latest }}"
+          title="Upstream $latest conflicts with the Windows port"
+
+          # A conflicted merge pushes no branch, so the branch check above
+          # never trips and this step is reached every day until someone
+          # resolves it. One issue per upstream tag is enough.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing already tracks this conflict"
+            exit 0
+          fi
+
           cat > /tmp/issue-body.md <<BODY
           Upstream released [\`$latest\`](https://github.com/$UPSTREAM/releases/tag/$latest),
           but merging it onto \`main\` hit conflicts, so it needs resolving by hand:
@@ -175,5 +187,5 @@ jobs:
           Update \`UPSTREAM_VERSION\` to \`$latest\` as part of the fix.
           BODY
           gh issue create --repo "$GITHUB_REPOSITORY" \
-            --title "Upstream $latest conflicts with the Windows port" \
+            --title "$title" \
             --body-file /tmp/issue-body.md
