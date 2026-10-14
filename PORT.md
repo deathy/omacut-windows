@@ -166,12 +166,15 @@ version for more (see the checklist below), even when every patch applies
 cleanly. Watch for tests that pass on Windows only because their setup
 quietly does nothing there, not just ones that fail.
 
-Known gap: `thumbnailWorkerStopsBlockedJobs` (`thumbProviderStopsBlockedJobs`
-from v0.7.0) fakes a hanging ffmpeg with a `#!/bin/sh` script that runs
-`sleep`. On Windows that script can never start, so the test proves nothing.
-It passes in CI only because the runner happens to have Git's `sleep.exe` on
-its PATH, and it fails its own precondition anywhere `sleep` is missing. It
-still needs a Windows equivalent: a fake ffmpeg that really hangs.
+Example: `thumbProviderStopsBlockedJobs` (`thumbnailWorkerStopsBlockedJobs`
+before v0.7.0) fakes a hanging ffmpeg with a `#!/bin/sh` script that runs
+`sleep`. On Windows that script never starts, so the test used to pass
+without testing anything, and only where a `sleep` happened to be on the
+PATH. On Windows the port now hangs the *real* ffmpeg instead: its input is
+a named pipe (`CreateNamedPipeW`) that never sends a byte. The test then
+waits until ffmpeg has opened the pipe (`GetNamedPipeClientProcessId`)
+before timing the stop. Use the same trick for any future test that needs a
+hung ffmpeg.
 
 ### 6. Windows executable metadata
 

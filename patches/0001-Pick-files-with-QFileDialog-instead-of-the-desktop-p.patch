@@ -20,19 +20,19 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 06e35aa2d2513099bbc42d9ad89dce8ec2b59747..75347fa6b2533d02bdb1eab348c1e50f87dd7c03 100644
+index 1c64b004cc5c306358f2df868611b0c15afdb98c..06cfab58e6fbcf2f996bfda0be0db3b2d21780c2 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -11,7 +11,7 @@
- #include <memory>
+@@ -13,7 +13,7 @@
+ #include <utility>
  
  #include "filepicker.h"
 -#include "portalfilepicker.h"
 +#include "dialogfilepicker.h"
  #include "thumbprovider.h"
- #include "thumbworker.h"
  
-@@ -47,7 +47,7 @@ bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
+ namespace {
+@@ -46,7 +46,7 @@ bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
  }
  
  Backend::Backend(ThumbProvider *provider, QObject *parent)
@@ -42,7 +42,7 @@ index 06e35aa2d2513099bbc42d9ad89dce8ec2b59747..75347fa6b2533d02bdb1eab348c1e50f
  Backend::Backend(ThumbProvider *provider, FilePicker *filePicker, QObject *parent)
      : QObject(parent), m_provider(provider), m_filePicker(filePicker),
 diff --git a/src/main.cpp b/src/main.cpp
-index 1c6812060fee1112504dff5a2c528f6ad90da6bc..53974996f933e1234b517c36e4a7e948cfd0f48e 100644
+index ae549d4403d7b51c27cd01839a172861daba98ac..b30752e1c5ac34f0eae582c6574af11e98f90daa 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
 @@ -1,6 +1,8 @@
@@ -52,10 +52,10 @@ index 1c6812060fee1112504dff5a2c528f6ad90da6bc..53974996f933e1234b517c36e4a7e948
 +// QApplication rather than QGuiApplication: the file picker is a QFileDialog,
 +// and widgets need the widget application to exist.
 +#include <QApplication>
+ #include <QFileInfo>
  #include <QIcon>
  #include <QQmlApplicationEngine>
- #include <QQmlContext>
-@@ -18,7 +20,7 @@ int main(int argc, char *argv[]) {
+@@ -19,7 +21,7 @@ int main(int argc, char *argv[]) {
      if (!qEnvironmentVariableIsSet("QT_FFMPEG_DECODING_HW_DEVICE_TYPES"))
          qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", "vaapi,cuda");
  
