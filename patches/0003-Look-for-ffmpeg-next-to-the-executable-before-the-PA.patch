@@ -15,7 +15,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 9 insertions(+)
 
 diff --git a/src/ffmpeg.cpp b/src/ffmpeg.cpp
-index fbea5b4f301731e4b10932e4974bb4108c705905..e2911364015c6abd18bdf44c2c4a9c9cf6042a0e 100644
+index b6a19fb80d7e1c2ad2a3ea9a5eeb02f1c8673a2d..80733f17be0760b4d947d157d634ab0a14518320 100644
 --- a/src/ffmpeg.cpp
 +++ b/src/ffmpeg.cpp
 @@ -1,5 +1,6 @@

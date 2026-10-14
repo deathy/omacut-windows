@@ -3,7 +3,7 @@ From: Cristian Vat <cristian.vat@gmail.com>
 Date: Wed, 14 Oct 2026 15:17:11 +0300
 Subject: [PATCH] Make the backend tests pass on Windows
 
-Three things stopped them, none of them the code under test:
+Four things stopped them, none of them the code under test:
 
 PATH entries were joined with ':', so the directory holding the
 deliberately-broken ffmpeg became part of one nonsense entry and was
@@ -16,6 +16,13 @@ nothing about shebangs, so it was neither found nor started. An
 "ffmpeg.exe" holding no valid executable image fails to start for the
 reason the test actually wants.
 
+The hanging ffmpeg in thumbProviderStopsBlockedJobs was a shebang script
+too, so on Windows it never ran and the test passed without testing
+anything -- and only where a "sleep" happened to be on the PATH. There
+the real ffmpeg is given a named pipe for input that never sends a byte,
+and the test waits until ffmpeg has opened it, so the stop it times
+really does cut a hang short.
+
 And exportStartFailureClearsBusy checked that the export is briefly busy
 after a failed start, which holds only where a failed exec is reported
 asynchronously. CreateProcess fails inline, so the cleanup has already
@@ -24,14 +31,28 @@ run everywhere.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- tests/backend_tests.cpp | 31 +++++++++++++++++++++++++++----
- 1 file changed, 27 insertions(+), 4 deletions(-)
+ tests/backend_tests.cpp | 61 +++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 56 insertions(+), 5 deletions(-)
 
 diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
-index 58bb9b2105df0b9edc660cb19ea4ec3275a0f678..1970c77201a68117dbdf8640cec10dc66dbce5d2 100644
+index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29eb712acf3 100644
 --- a/tests/backend_tests.cpp
 +++ b/tests/backend_tests.cpp
-@@ -262,9 +262,26 @@ QString BackendTests::formatName(const QString &path) const {
+@@ -20,6 +20,13 @@
+ 
+ #include <memory>
+ 
++#ifdef Q_OS_WIN
++#include <QScopeGuard>
++#include <QUuid>
++#define NOMINMAX
++#include <windows.h>
++#endif
++
+ #include "backend.h"
+ #include "filepicker.h"
+ #include "thumbprovider.h"
+@@ -286,9 +293,26 @@ QString BackendTests::formatName(const QString &path) const {
      return QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
  }
  
@@ -60,7 +81,7 @@ index 58bb9b2105df0b9edc660cb19ea4ec3275a0f678..1970c77201a68117dbdf8640cec10dc6
      QFile fake(QDir(dirPath).filePath(QStringLiteral("ffmpeg")));
      if (!fake.open(QIODevice::WriteOnly | QIODevice::Truncate))
          return false;
-@@ -272,6 +289,7 @@ bool BackendTests::installBrokenFfmpeg(const QString &dirPath) {
+@@ -296,6 +320,7 @@ bool BackendTests::installBrokenFfmpeg(const QString &dirPath) {
      fake.close();
      return fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                                 | QFileDevice::ExeOwner);
@@ -68,7 +89,49 @@ index 58bb9b2105df0b9edc660cb19ea4ec3275a0f678..1970c77201a68117dbdf8640cec10dc6
  }
  
  void BackendTests::openDialogDelegatesToFilePicker() {
-@@ -602,12 +620,17 @@ void BackendTests::exportStartFailureClearsBusy() {
+@@ -430,6 +455,18 @@ void BackendTests::thumbProviderServesAndCachesFrames() {
+ }
+ 
+ void BackendTests::thumbProviderStopsBlockedJobs() {
++#ifdef Q_OS_WIN
++    // Windows cannot start the shebang script below, so it would never hang
++    // anything. Hang the real ffmpeg instead: give it a named pipe for input
++    // that accepts the connection and never sends a byte.
++    const QString video = QStringLiteral("\\\\.\\pipe\\omacut-tests-%1")
++                              .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
++    const HANDLE pipe = CreateNamedPipeW(reinterpret_cast<const wchar_t *>(video.utf16()),
++                                         PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE | PIPE_WAIT,
++                                         1, 0, 0, 0, nullptr);
++    QVERIFY(pipe != INVALID_HANDLE_VALUE);
++    const auto closePipe = qScopeGuard([pipe] { CloseHandle(pipe); });
++#else
+     const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
+     QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
+ 
+@@ -445,12 +482,21 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
+ 
+     EnvVarGuard pathGuard("PATH");
+     qputenv("PATH", QFile::encodeName(pathDir.path()));
++    const QString video = QStringLiteral("unused.mp4");
++#endif
+ 
+     // Closing the app mustn't wait on a hung ffmpeg.
+     auto provider = std::make_unique<ThumbProvider>();
+-    provider->setVideo(1, QStringLiteral("unused.mp4"));
++    provider->setVideo(1, video);
+     std::unique_ptr<QQuickImageResponse> response(
+         provider->requestImageResponse(QStringLiteral("1/0"), QSize()));
++#ifdef Q_OS_WIN
++    // A pipe only has a client process once something has opened it. Wait for
++    // ffmpeg to be that client, so the stop below really cuts short a hang.
++    ULONG client = 0;
++    QVERIFY2(QTest::qWaitFor([&] { return GetNamedPipeClientProcessId(pipe, &client) != 0; }, 5000),
++             "ffmpeg opened the pipe");
++#endif
+     QTest::qWait(100);
+ 
+     QElapsedTimer elapsed;
+@@ -788,12 +834,17 @@ void BackendTests::exportStartFailureClearsBusy() {
      QVERIFY(installBrokenFfmpeg(pathDir.path()));
  
      EnvVarGuard pathGuard("PATH");
@@ -76,7 +139,7 @@ index 58bb9b2105df0b9edc660cb19ea4ec3275a0f678..1970c77201a68117dbdf8640cec10dc6
 +    qputenv("PATH", pathPrependedTo(pathDir.path(), qgetenv("PATH")));
  
      backend.exportClips(QUrl::fromLocalFile(m_dir.filePath(QStringLiteral("failed.mp4"))),
-                         edit::whole(1.0));
+                         wholeVideo(1.0));
  
 +#ifndef Q_OS_WIN
 +    // Unix reports a failed exec asynchronously, so the export is briefly busy.
@@ -87,12 +150,12 @@ index 58bb9b2105df0b9edc660cb19ea4ec3275a0f678..1970c77201a68117dbdf8640cec10dc6
      QTRY_COMPARE_WITH_TIMEOUT(failedSpy.count(), 1, 5000);
      QVERIFY(!backend.busy());
      QVERIFY(backend.status().isEmpty());
-@@ -639,7 +662,7 @@ void BackendTests::failedExportPreservesExistingFile() {
+@@ -825,7 +876,7 @@ void BackendTests::failedExportPreservesExistingFile() {
      QVERIFY(installBrokenFfmpeg(pathDir.path()));
  
      EnvVarGuard pathGuard("PATH");
 -    qputenv("PATH", QFile::encodeName(pathDir.path()) + ':' + qgetenv("PATH"));
 +    qputenv("PATH", pathPrependedTo(pathDir.path(), qgetenv("PATH")));
  
-     backend.exportClips(QUrl::fromLocalFile(outPath), edit::whole(1.0));
+     backend.exportClips(QUrl::fromLocalFile(outPath), wholeVideo(1.0));
      QTRY_COMPARE_WITH_TIMEOUT(failedSpy.count(), 1, 5000);

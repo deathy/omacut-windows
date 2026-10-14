@@ -15,10 +15,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 4 insertions(+)
 
 diff --git a/src/main.cpp b/src/main.cpp
-index 53974996f933e1234b517c36e4a7e948cfd0f48e..a723fda8d9b489e86dcdeb407fedece9e6b2d9db 100644
+index b30752e1c5ac34f0eae582c6574af11e98f90daa..eca890db2dcc0c4489512c5548e05654d50ebc96 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -17,8 +17,12 @@ int main(int argc, char *argv[]) {
+@@ -18,8 +18,12 @@ int main(int argc, char *argv[]) {
      // and on GPUs without Vulkan decode queues it then picks ffmpeg's hwaccel-only
      // av1 decoder and never falls back to dav1d, leaving the preview black. Stick
      // to the backends Qt checks codec support for, so software decode kicks in.

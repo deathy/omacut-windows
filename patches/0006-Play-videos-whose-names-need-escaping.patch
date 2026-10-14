@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cristian Vat <cristian.vat@gmail.com>
+Date: Wed, 14 Oct 2026 16:33:06 +0300
+Subject: [PATCH] Play videos whose names need escaping
+
+Main.qml tells whether the player already holds a clip's video by
+comparing URLs as text: MediaPlayer.source against backend.videos[i].url.
+The first is QML's own url type, which prints decoded. The second was a
+QUrl inside a QVariantMap, which reaches QML as a JS URL and prints fully
+percent-encoded. Only names with nothing to escape compared equal, so for
+a name with a space, a non-ASCII letter, or the zero-width spaces Windows
+puts in game capture names, show() always took the "still loading" path,
+set the same source again, and waited for a load that never came: the
+video showed but would not play.
+
+Hand QML the url as text in the decoded form, so both sides print alike.
+Main.qml's player.source = url assignments take text just as well.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/backend.cpp         |  7 ++++++-
+ tests/backend_tests.cpp | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/src/backend.cpp b/src/backend.cpp
+index 008923844f0f96b46bbd9ed2b7ec27dce44c814f..2f39bcbba95024a4a576a5690cf82ea21d64823e 100644
+--- a/src/backend.cpp
++++ b/src/backend.cpp
+@@ -193,8 +193,13 @@ bool Backend::isVideoPath(const QString &path) const {
+ 
+ QVariantList Backend::videoList() const {
+     QVariantList result;
++    // The url goes out as text, in the form QML's own url type prints. A QUrl
++    // in a QVariantMap reaches QML as a JS URL instead, whose text is fully
++    // percent-encoded, while Main.qml compares it as text against
++    // MediaPlayer.source. Any name with a space or a non-ASCII letter then
++    // never matched, and play waited for a load that was never coming.
+     for (const Video &video : m_videos)
+-        result.append(QVariantMap{{QStringLiteral("url"), video.url},
++        result.append(QVariantMap{{QStringLiteral("url"), video.url.toString()},
+                                   {QStringLiteral("thumbKey"), video.thumbKey}});
+     return result;
+ }
+diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
+index d4da5bfd7d2ccb23a7956ecc5c93d29eb712acf3..cea2e412572a92ab724f01c061da71b6d8dd28bd 100644
+--- a/tests/backend_tests.cpp
++++ b/tests/backend_tests.cpp
+@@ -20,6 +20,8 @@
+ 
+ #include <memory>
+ 
++#include <QMediaPlayer>
++
+ #ifdef Q_OS_WIN
+ #include <QScopeGuard>
+ #include <QUuid>
+@@ -216,6 +218,7 @@ private slots:
+     void exportStartFailureClearsBusy();
+     void failedExportPreservesExistingFile();
+     void qmlDoesNotCreateAudioOutputWithoutVideo();
++    void qmlPlaysVideosWhoseNamesNeedEscaping();
+     void qmlShortcutsTriggerBackendActions();
+     void qmlArrowKeysMoveThePlayhead();
+     void qmlNumberKeysJumpThroughTheEdit();
+@@ -897,6 +900,33 @@ void BackendTests::qmlDoesNotCreateAudioOutputWithoutVideo() {
+     QCOMPARE(harness.window()->property("audioOutputReady").toBool(), false);
+ }
+ 
++// Main.qml tells whether the player already holds a clip's video by comparing
++// URLs as text, so they have to print the same way whatever the file is called.
++void BackendTests::qmlPlaysVideosWhoseNamesNeedEscaping() {
++    const QString path = makeVideo(QStringLiteral("a clip é​.mp4"), 4.0, false);
++    QVERIFY(!path.isEmpty());
++
++    ThumbProvider provider;
++    Backend backend(&provider, new FakeFilePicker);
++    QmlHarness harness(backend);
++    QQuickWindow *window = harness.window();
++    QVERIFY2(window, qPrintable(mainQmlPath()));
++    window->show();
++    window->requestActivate();
++    QVERIFY(backend.load(QUrl::fromLocalFile(path)));
++    waitForBackgroundWork(backend);
++
++    auto *player = window->findChild<QMediaPlayer *>();
++    QVERIFY(player);
++    QTRY_VERIFY_WITH_TIMEOUT(player->mediaStatus() == QMediaPlayer::LoadedMedia
++                                 || player->mediaStatus() == QMediaPlayer::BufferedMedia, 5000);
++    // Let the first frame go up and the player settle, paused, on it.
++    QTRY_COMPARE_WITH_TIMEOUT(player->playbackState(), QMediaPlayer::PausedState, 5000);
++
++    QTest::keyClick(window, Qt::Key_Space);
++    QTRY_VERIFY_WITH_TIMEOUT(player->position() > 500, 5000);
++}
++
+ void BackendTests::qmlShortcutsTriggerBackendActions() {
+     ShortcutBackend backend(QUrl::fromLocalFile(m_dir.filePath(QStringLiteral("shortcut-placeholder.mp4"))),
+                             1.0);
