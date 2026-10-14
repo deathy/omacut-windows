@@ -66,6 +66,13 @@ That assembles the source, builds it, gathers the Qt runtime, downloads ffmpeg,
 and leaves a runnable folder in `build\omacut-local-win64\`. Pass `-SkipFfmpeg`
 if you already have ffmpeg on your `PATH`.
 
+To run everything CI runs, both test suites included, from any PowerShell
+prompt (MSVC is found on its own; the tests need ffmpeg on the `PATH`):
+
+```powershell
+pwsh -File bin\check-local.ps1 -QtDir C:\Qt\6.8.1\msvc2022_64
+```
+
 The port also builds on macOS, which is a way to check it without a Windows
 machine in the loop:
 

@@ -202,8 +202,12 @@ git -C work add <files>
 git -C work am --continue          # repeat until all patches are applied
 pwsh -File bin/export-patches.ps1  # rewrites patches/ against vX.Y.Z
 Set-Content UPSTREAM_VERSION vX.Y.Z
-pwsh -File bin/prepare-source.ps1  # check a clean re-apply, then build and test
+pwsh -File bin/check-local.ps1     # clean re-apply, build, test, package -- as CI does
 ```
+
+`check-local.ps1` runs CI's whole build on a Windows machine with MSVC, Qt
+and ffmpeg. Pass `-Ref vX.Y.Z` to try a newer upstream before touching
+`UPSTREAM_VERSION`, or `-SkipPrepare` to build `work/` as it is mid-resolution.
 
 To change a patch rather than resolve one, edit the files in `work/`, change
 the matching commit there (`git -C work commit --fixup`, then
@@ -230,7 +234,8 @@ and look in the new code for:
 - a `QGuiApplication` created anywhere else, which the widget picker needs to
   be a `QApplication`.
 
-Then let CI build it and run the tests on Windows, and try the build artifact
+Then build and test it on Windows (`check-local.ps1`, and CI on the pull
+request), and try the build artifact
 on a Windows machine: open, trim, export, and export over an existing file.
 
 ## Recreating the patches from scratch

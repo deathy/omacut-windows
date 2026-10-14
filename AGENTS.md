@@ -12,3 +12,6 @@ for moving to a new upstream release.
 
 Never commit `work/`, and never leave a change only in `work/`. Export it with
 `bin/export-patches.ps1`.
+
+To verify a change on Windows the way CI does (build, both test suites,
+package), run `pwsh -File bin/check-local.ps1`.
