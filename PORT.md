@@ -176,7 +176,33 @@ waits until ffmpeg has opened the pipe (`GetNamedPipeClientProcessId`)
 before timing the stop. Use the same trick for any future test that needs a
 hung ffmpeg.
 
-### 6. Windows executable metadata
+### 6. Play videos whose names need escaping
+
+*Patch:* `Play videos whose names need escaping`.
+
+**Why.** `Main.qml` decides whether the player already holds a clip's video
+by comparing URLs as text: `player.source.toString()` against
+`backend.videos[i].url.toString()`. The first is QML's own `url` type, which
+prints decoded (`a b.mp4`). The second came from a `QUrl` inside the
+`QVariantMap` that `Backend::videoList()` returns. On the Qt 6.8 that this
+port builds with, that reaches QML as a JS `URL`, which prints fully
+percent-encoded (`a%20b.mp4`). Any file name with a space or a non-ASCII
+letter then never compared equal. That includes Windows Game Bar captures,
+whose names are full of zero-width spaces. `show()` kept setting the same
+source and waiting for a load that never came: the video showed, and play
+did nothing.
+
+**What.** `videoList()` hands out the url as text, `QUrl::toString()`, which
+is the same form QML's `url` type prints. The test
+`qmlPlaysVideosWhoseNamesNeedEscaping` opens such a file through the real
+`Main.qml` and checks that Space plays it.
+
+**When to drop it.** This is not Windows-specific. Whether upstream's Linux
+build has it depends on the Qt version there. If upstream compares these URLs
+some other way, or stops passing `QUrl`s through `videoList()`, check whether
+the test still passes without this patch, and drop the patch if it does.
+
+### 7. Windows executable metadata
 
 *Overlay only:* the `win32 {}` block in `omacut-windows.pro` and
 `pkgbuild/omacut.ico`. Gives `omacut.exe` its icon and its version-info
@@ -235,11 +261,15 @@ and look in the new code for:
 - new tests that use `':'` in PATH, `#!` fakes, `setPermissions(ExeOwner)`,
   `sleep`/`sh`, or that assume an asynchronous process failure (section 5);
 - a `QGuiApplication` created anywhere else, which the widget picker needs to
-  be a `QApplication`.
+  be a `QApplication`;
+- URLs compared as text in QML, or new `QUrl`s handed to QML inside a
+  `QVariantMap`/`QVariantList`, which print differently from `url`
+  properties (section 6).
 
 Then build and test it on Windows (`check-local.ps1`, and CI on the pull
-request), and try the build artifact
-on a Windows machine: open, trim, export, and export over an existing file.
+request), and try the build artifact on a Windows machine. Use a video whose
+name has spaces and a non-ASCII letter, because most real ones do: open,
+play, trim, export, and export over an existing file.
 
 ## Recreating the patches from scratch
 
@@ -250,7 +280,7 @@ Remove-Item patches/*.patch
 pwsh -File bin/prepare-source.ps1 -Ref vX.Y.Z   # upstream + overlay, no patches
 ```
 
-Then, in `work/`, carry out sections 1 to 5 against the code as it now is. Make one
+Then, in `work/`, carry out sections 1 to 6 against the code as it now is. Make one
 commit per section with a message that explains the why, as the existing
 patches do. Then run `export-patches.ps1`, update `UPSTREAM_VERSION`, and
 go through the checklist above. If upstream has reworked something so far
