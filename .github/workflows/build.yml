@@ -21,6 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # There is no omacut source in this repository: the tree to build is
+      # upstream at UPSTREAM_VERSION with overlay/ and patches/ on top, put
+      # together in work/. See PORT.md.
+      - name: Prepare source
+        shell: pwsh
+        run: ./bin/prepare-source.ps1
+
       - uses: ./.github/actions/setup-windows-build
 
       - name: Build omacut
@@ -28,7 +35,7 @@ jobs:
         run: |
           call "%VCVARS%" || exit /b 1
           mkdir build && cd build
-          qmake "%GITHUB_WORKSPACE%\omacut.pro" || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\work\omacut-windows.pro" || exit /b 1
           nmake || exit /b 1
 
       # Absolute .pro paths, so __FILE__ comes out absolute in the binary --
@@ -40,11 +47,11 @@ jobs:
         run: |
           call "%VCVARS%" || exit /b 1
           mkdir build-tests && cd build-tests
-          qmake "%GITHUB_WORKSPACE%\tests\backend_tests.pro" || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\work\tests\backend_tests-windows.pro" || exit /b 1
           nmake || exit /b 1
           cd ..
           mkdir build-tests-picker && cd build-tests-picker
-          qmake "%GITHUB_WORKSPACE%\tests\dialogfilepicker_tests.pro" || exit /b 1
+          qmake "%GITHUB_WORKSPACE%\work\tests\dialogfilepicker_tests.pro" || exit /b 1
           nmake || exit /b 1
 
       - name: Install ffmpeg for the test run

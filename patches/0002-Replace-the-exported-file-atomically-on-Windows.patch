@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cristian Vat <cristian.vat@gmail.com>
+Date: Wed, 14 Oct 2026 15:16:48 +0300
+Subject: [PATCH] Replace the exported file atomically on Windows
+
+An export is written to a temporary file and then renamed over the
+destination. std::rename() cannot do that on Windows when the
+destination already exists -- exactly the case when re-exporting over a
+previous cut -- and QFile::encodeName() turns a non-ASCII path into the
+local 8-bit code page on the way. MoveFileExW with
+MOVEFILE_REPLACE_EXISTING replaces in one step and takes the path as
+UTF-16. Other platforms keep upstream's rename.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/backend.cpp | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/src/backend.cpp b/src/backend.cpp
+index 75347fa6b2533d02bdb1eab348c1e50f87dd7c03..066b3ebd04ecbd9c2b45d12969b4edbb1ee216e4 100644
+--- a/src/backend.cpp
++++ b/src/backend.cpp
+@@ -10,6 +10,10 @@
+ #include <cstdio>
+ #include <memory>
+ 
++#ifdef Q_OS_WIN
++#include <windows.h>
++#endif
++
+ #include "filepicker.h"
+ #include "dialogfilepicker.h"
+ #include "thumbprovider.h"
+@@ -40,9 +44,19 @@ QString mp4PathFor(const QString &path) {
+ }
+ 
+ bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
++#ifdef Q_OS_WIN
++    // std::rename() fails on Windows when the destination exists, which is the
++    // common case here -- re-exporting over a previous cut -- and
++    // QFile::encodeName would mangle a non-ASCII path on the way. MoveFileExW
++    // replaces in one step, atomically within a volume, and takes UTF-16.
++    return MoveFileExW(reinterpret_cast<const wchar_t *>(tmpPath.utf16()),
++                       reinterpret_cast<const wchar_t *>(outPath.utf16()),
++                       MOVEFILE_REPLACE_EXISTING) != 0;
++#else
+     const QByteArray tmpName = QFile::encodeName(tmpPath);
+     const QByteArray outName = QFile::encodeName(outPath);
+     return std::rename(tmpName.constData(), outName.constData()) == 0;
++#endif
+ }
+ }
+ 
