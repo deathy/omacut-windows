@@ -8,6 +8,10 @@
     the "x64 Native Tools Command Prompt for VS" -- with Qt's bin directory on
     the PATH too, or passed as -QtDir.
 
+    The source is assembled first (bin\prepare-source.ps1: upstream omacut at
+    UPSTREAM_VERSION, plus overlay\ and patches\) into work\. Pass
+    -SkipPrepare to build work\ as it stands, e.g. while changing a patch.
+
     ffmpeg is downloaded automatically, so there is nothing to install first.
 
 .EXAMPLE
@@ -17,6 +21,7 @@
 param(
     [string]$QtDir,
     [switch]$SkipFfmpeg,
+    [switch]$SkipPrepare,
     [switch]$Clean
 )
 
@@ -25,6 +30,12 @@ Set-StrictMode -Version Latest
 
 $root  = Split-Path -Parent $PSScriptRoot
 $build = Join-Path $root 'build'
+$work  = Join-Path $root 'work'
+
+if (-not $SkipPrepare) {
+    & (Join-Path $PSScriptRoot 'prepare-source.ps1')
+    if ($LASTEXITCODE -ne 0) { throw "prepare-source failed ($LASTEXITCODE)" }
+}
 
 if ($Clean -and (Test-Path $build)) { Remove-Item -Recurse -Force $build }
 New-Item -ItemType Directory -Force -Path $build | Out-Null
@@ -44,7 +55,7 @@ Write-Host "make:  $($make.Source)"
 
 Push-Location $build
 try {
-    & $qmake.Source (Join-Path $root 'omacut.pro')
+    & $qmake.Source (Join-Path $work 'omacut-windows.pro')
     if ($LASTEXITCODE -ne 0) { throw "qmake failed ($LASTEXITCODE)" }
     & $make.Source
     if ($LASTEXITCODE -ne 0) { throw "build failed ($LASTEXITCODE)" }
@@ -52,7 +63,7 @@ try {
 
 # Staging, the Qt runtime, ffmpeg and the licences all live in one place, so a
 # local build and a release build produce the same folder.
-$packageArgs = @{ Version = 'local'; BuildDir = $build; OutDir = $build }
+$packageArgs = @{ Version = 'local'; BuildDir = $build; OutDir = $build; SourceDir = $work }
 if ($SkipFfmpeg) { $packageArgs['SkipFfmpeg'] = $true }
 & (Join-Path $PSScriptRoot 'package-windows.ps1') @packageArgs
 

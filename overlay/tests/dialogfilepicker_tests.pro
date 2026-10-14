@@ -3,7 +3,7 @@ CONFIG += c++17 testcase
 # qmake builds a GUI-subsystem binary on Windows by default, which detaches
 # stdout -- QtTest's results would go nowhere.
 win32: CONFIG += console
-# and an .app bundle on macOS, which bin/test would not find.
+# and an .app bundle on macOS, which nothing would look inside for.
 macx: CONFIG -= app_bundle
 TARGET = dialogfilepicker_tests
 TEMPLATE = app

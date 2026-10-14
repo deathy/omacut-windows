@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cristian Vat <cristian.vat@gmail.com>
+Date: Wed, 14 Oct 2026 15:17:03 +0300
+Subject: [PATCH] Keep the hardware decoder list to Linux
+
+QT_FFMPEG_DECODING_HW_DEVICE_TYPES does not add to Qt's choice of
+hardware decoders, it replaces it. "vaapi,cuda" is the right list on
+Linux, where it keeps Qt off the Vulkan path that leaves AV1 black. On
+Windows neither name is the platform's decoder -- that is D3D11 -- so
+the same line would quietly turn hardware decoding off for every codec.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/main.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index 53974996f933e1234b517c36e4a7e948cfd0f48e..a723fda8d9b489e86dcdeb407fedece9e6b2d9db 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -17,8 +17,12 @@ int main(int argc, char *argv[]) {
+     // and on GPUs without Vulkan decode queues it then picks ffmpeg's hwaccel-only
+     // av1 decoder and never falls back to dav1d, leaving the preview black. Stick
+     // to the backends Qt checks codec support for, so software decode kicks in.
++    // Linux only: the list replaces Qt's own, and elsewhere that would drop the
++    // platform's decoder (D3D11 on Windows, VideoToolbox on macOS).
++#ifdef Q_OS_LINUX
+     if (!qEnvironmentVariableIsSet("QT_FFMPEG_DECODING_HW_DEVICE_TYPES"))
+         qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", "vaapi,cuda");
++#endif
+ 
+     QApplication app(argc, argv);
+     app.setApplicationName("omacut");

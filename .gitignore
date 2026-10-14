@@ -1,14 +1,6 @@
+# The prepared source tree: upstream + patches/ + overlay/. Never edit it as
+# if it were ours -- see PORT.md.
+/work/
 /build/
-/pkg/
-/pkgbuild/pkg/
-/pkgbuild/src/
-*.pkg.tar.*
-*.src.tar.*
-*.o
-*.moc
-moc_*.cpp
-qrc_*.cpp
-.qmake.stash
-Makefile
-build-tests/
+/build-tests*/
 /dist/

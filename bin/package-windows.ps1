@@ -16,6 +16,8 @@ param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$BuildDir,
     [string]$OutDir,
+    # The prepared tree -- upstream plus the port; see bin\prepare-source.ps1.
+    [string]$SourceDir,
     [switch]$SkipFfmpeg
 )
 
@@ -25,6 +27,7 @@ Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $BuildDir) { $BuildDir = Join-Path $root 'build' }
 if (-not $OutDir)   { $OutDir   = Join-Path $root 'dist' }
+if (-not $SourceDir) { $SourceDir = Join-Path $root 'work' }
 
 $name  = "omacut-$Version-win64"
 $stage = Join-Path $OutDir $name
@@ -41,7 +44,8 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item $exe.FullName -Destination $stage -Force
-Copy-Item (Join-Path $root 'LICENSE')         -Destination (Join-Path $stage 'LICENSE.txt')     -Force
+# omacut's own licence, from the upstream tree this was built from.
+Copy-Item (Join-Path $SourceDir 'LICENSE')    -Destination (Join-Path $stage 'LICENSE.txt')     -Force
 Copy-Item (Join-Path $root 'THIRD-PARTY.md')  -Destination (Join-Path $stage 'THIRD-PARTY.md')  -Force
 # THIRD-PARTY.md points at these by name, so they have to travel with it.
 Get-ChildItem -Path (Join-Path $root 'licenses') -File |
@@ -49,7 +53,7 @@ Get-ChildItem -Path (Join-Path $root 'licenses') -File |
 
 $windeployqt = Get-Command 'windeployqt' -ErrorAction SilentlyContinue
 if (-not $windeployqt) { throw "windeployqt was not found on the PATH" }
-& $windeployqt.Source --release --qmldir (Join-Path $root 'src') `
+& $windeployqt.Source --release --qmldir (Join-Path $SourceDir 'src') `
     --no-translations --no-system-d3d-compiler --no-compiler-runtime `
     (Join-Path $stage 'omacut.exe')
 if ($LASTEXITCODE -ne 0) { throw "windeployqt failed ($LASTEXITCODE)" }
