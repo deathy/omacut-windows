@@ -163,8 +163,15 @@ be expressed on Windows, `QSKIP` it there with the reason. Do not delete it.
 
 **Upstream adds tests of this kind regularly**, so check every new upstream
 version for more (see the checklist below), even when every patch applies
-cleanly. Example: v0.7.0 adds `thumbProviderStopsBlockedJobs`, which fakes a
-hanging ffmpeg with `#!/bin/sh` and `sleep`.
+cleanly. Watch for tests that pass on Windows only because their setup
+quietly does nothing there, not just ones that fail.
+
+Known gap: `thumbnailWorkerStopsBlockedJobs` (`thumbProviderStopsBlockedJobs`
+from v0.7.0) fakes a hanging ffmpeg with a `#!/bin/sh` script that runs
+`sleep`. On Windows that script can never start, so the test proves nothing.
+It passes in CI only because the runner happens to have Git's `sleep.exe` on
+its PATH, and it fails its own precondition anywhere `sleep` is missing. It
+still needs a Windows equivalent: a fake ffmpeg that really hangs.
 
 ### 6. Windows executable metadata
 
