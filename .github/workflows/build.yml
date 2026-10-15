@@ -117,9 +117,20 @@ jobs:
   # the source is macOS-specific; this is packaging and CI only. See PORT.md,
   # "macOS".
   macos:
-    runs-on: macos-latest
+    # Not macos-latest: Qt 6.8.1 supports the macOS 15 SDK, and its headers
+    # stop compiling under Xcode 26 (qyieldcpu.h calls an undeclared
+    # __yield). Moving off 6.8.1 would mean leaving the Qt the Windows build
+    # and patches 6 and 7 are written against.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
+
+      - name: Use the Xcode Qt 6.8.1 supports
+        run: |
+          xcode="$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          if [ -z "$xcode" ]; then echo "No Xcode 16 on this runner"; ls -d /Applications/Xcode*; exit 1; fi
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
 
       - name: Prepare source
         shell: pwsh
