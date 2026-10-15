@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: omacut-windows prepare-source <prepare-source@omacut-windows.invalid>
+Date: Thu, 15 Oct 2026 12:13:38 +0300
+Subject: [PATCH] Add every video of a drop on Qt 6.8
+
+Dropping files on the window hands their urls to Backend::addVideos() as
+a QVariantList. On the Qt 6.8 this port builds with, each entry is a
+QVariant holding a QVariant that holds the QUrl, and toUrl() on that
+outer QVariant gives an empty url. Every file of every drop was then
+refused as not a local path, so a drop never opened or added anything.
+
+Unwrap the one extra level with qvariant_cast<QVariant>, which leaves a
+QVariant that already holds the QUrl as it is. The QML drop tests cover
+it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/backend.cpp | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/backend.cpp b/src/backend.cpp
+index d831ee4c0cb76a87d72637db5de86353ddff16d6..35cda4644f19f10b0b3705c55a092c8d80db4dd2 100644
+--- a/src/backend.cpp
++++ b/src/backend.cpp
+@@ -349,7 +349,11 @@ bool Backend::addVideos(const QVariantList &urls, double t) {
+     int queued = 0;
+     for (const QVariant &value : urls) {
+         PendingVideo pending;
+-        pending.url = value.toUrl();
++        // A drop's url list can reach here as QVariants that each hold a
++        // QVariant holding the QUrl (Qt 6.8 does), which toUrl() reads as
++        // empty; qvariant_cast<QVariant> unwraps one level, and is a no-op
++        // on a variant that already holds the QUrl.
++        pending.url = qvariant_cast<QVariant>(value).toUrl();
+         pending.adding = true;
+         pending.chain = true;
+         pending.addAt = t;

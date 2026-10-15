@@ -13,17 +13,24 @@ omacut-windows.pro takes the portal sources out of the build and puts
 DialogFilePicker in; this is the half that has to live in upstream's own
 files.
 
+The backend tests leave the portal out the same way, so upstream's test
+of PortalFilePicker itself, with its fake portal on a private D-Bus, has
+nothing to build against. Everything it needs is left out where
+OMACUT_NO_PORTAL_PICKER is defined, which backend_tests-windows.pro
+does, and the test skips there, saying why.
+
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/backend.cpp | 4 ++--
- src/main.cpp    | 6 ++++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ src/backend.cpp         |  4 ++--
+ src/main.cpp            |  6 ++++--
+ tests/backend_tests.cpp | 10 ++++++++++
+ 3 files changed, 16 insertions(+), 4 deletions(-)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 1c64b004cc5c306358f2df868611b0c15afdb98c..06cfab58e6fbcf2f996bfda0be0db3b2d21780c2 100644
+index d7de3cd4aabc9fe4e13520d71f253de9fc9dd489..665182ca909222e31b1cd81825e0d1d9155a622e 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -13,7 +13,7 @@
+@@ -19,7 +19,7 @@
  #include <utility>
  
  #include "filepicker.h"
@@ -32,7 +39,7 @@ index 1c64b004cc5c306358f2df868611b0c15afdb98c..06cfab58e6fbcf2f996bfda0be0db3b2
  #include "thumbprovider.h"
  
  namespace {
-@@ -46,7 +46,7 @@ bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
+@@ -52,7 +52,7 @@ bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
  }
  
  Backend::Backend(ThumbProvider *provider, QObject *parent)
@@ -64,3 +71,58 @@ index ae549d4403d7b51c27cd01839a172861daba98ac..b30752e1c5ac34f0eae582c6574af11e
      app.setApplicationName("omacut");
  
      // Associates the window with omacut.desktop so the compositor (Wayland app_id
+diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
+index eb16055aa601e8eae67432bedb2949776a802cd6..9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4 100644
+--- a/tests/backend_tests.cpp
++++ b/tests/backend_tests.cpp
+@@ -1,9 +1,11 @@
+ #include <QtTest>
+ 
++#ifndef OMACUT_NO_PORTAL_PICKER
+ #include <QDBusConnection>
+ #include <QDBusContext>
+ #include <QDBusMessage>
+ #include <QDBusObjectPath>
++#endif
+ #include <QDir>
+ #include <QDragEnterEvent>
+ #include <QDragLeaveEvent>
+@@ -27,9 +29,12 @@
+ 
+ #include "backend.h"
+ #include "filepicker.h"
++#ifndef OMACUT_NO_PORTAL_PICKER
+ #include "portalfilepicker.h"
++#endif
+ #include "thumbprovider.h"
+ 
++#ifndef OMACUT_NO_PORTAL_PICKER
+ // A fake org.freedesktop.portal.Request: only Close() matters here.
+ class FakePortalRequest : public QObject {
+     Q_OBJECT
+@@ -82,6 +87,7 @@ public slots:
+         return QDBusObjectPath(currentPath);
+     }
+ };
++#endif
+ 
+ class FakeFilePicker : public FilePicker {
+     Q_OBJECT
+@@ -2169,6 +2175,9 @@ void BackendTests::qmlDropTakesOnlyLocalFiles() {
+ }
+ 
+ void BackendTests::portalPickerReplacesAnUnansweredRequest() {
++#ifdef OMACUT_NO_PORTAL_PICKER
++    QSKIP("This build has no portal picker: it picks files with DialogFilePicker");
++#else
+     // The picker talks to whatever DBUS_SESSION_BUS_ADDRESS named when this
+     // process first touched the session bus, and by the time a test runs
+     // that is the real bus, where a real portal owns the name. So the
+@@ -2255,6 +2264,7 @@ void BackendTests::portalPickerReplacesAnUnansweredRequest() {
+         QStringLiteral("/org/freedesktop/portal/desktop"));
+     QDBusConnection::sessionBus().unregisterService(
+         QStringLiteral("org.freedesktop.portal.Desktop"));
++#endif
+ }
+ 
+ QTEST_MAIN(BackendTests)

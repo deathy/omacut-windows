@@ -16,12 +16,16 @@ nothing about shebangs, so it was neither found nor started. An
 "ffmpeg.exe" holding no valid executable image fails to start for the
 reason the test actually wants.
 
-The hanging ffmpeg in thumbProviderStopsBlockedJobs was a shebang script
-too, so on Windows it never ran and the test passed without testing
-anything -- and only where a "sleep" happened to be on the PATH. There
-the real ffmpeg is given a named pipe for input that never sends a byte,
-and the test waits until ffmpeg has opened it, so the stop it times
-really does cut a hang short.
+The hanging ffmpeg in thumbProviderStopsBlockedJobs and
+thumbProviderCancelsRunningJobs, and the slow ffprobe in
+probeRunsOffTheUiThread, were shebang scripts too, so on Windows they
+never ran. The tests failed, or passed without testing anything, and
+only where a "sleep" happened to be on the PATH. There the real tool is
+given a named pipe (SilentPipe) for input that never sends a byte, and
+each test waits until the tool has opened it, so what it times really
+does cut a hang short. The slow ffprobe is held on the pipe for the two
+seconds the fake sleeps, then let go by closing it, so the probe fails
+as the fake's empty output makes it fail.
 
 And exportStartFailureClearsBusy checked that the export is briefly busy
 after a failed start, which holds only where a failed exec is reported
@@ -31,19 +35,18 @@ run everywhere.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- tests/backend_tests.cpp | 61 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 56 insertions(+), 5 deletions(-)
+ tests/backend_tests.cpp | 118 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 111 insertions(+), 7 deletions(-)
 
 diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
-index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29eb712acf3 100644
+index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee29794478 100644
 --- a/tests/backend_tests.cpp
 +++ b/tests/backend_tests.cpp
-@@ -20,6 +20,13 @@
+@@ -27,6 +27,12 @@
  
  #include <memory>
  
 +#ifdef Q_OS_WIN
-+#include <QScopeGuard>
 +#include <QUuid>
 +#define NOMINMAX
 +#include <windows.h>
@@ -51,8 +54,8 @@ index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29e
 +
  #include "backend.h"
  #include "filepicker.h"
- #include "thumbprovider.h"
-@@ -286,9 +293,26 @@ QString BackendTests::formatName(const QString &path) const {
+ #ifndef OMACUT_NO_PORTAL_PICKER
+@@ -377,9 +383,64 @@ QString BackendTests::formatName(const QString &path) const {
      return QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
  }
  
@@ -63,6 +66,44 @@ index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29e
 +static QByteArray pathPrependedTo(const QString &dirPath, const QByteArray &path) {
 +    return QFile::encodeName(dirPath) + QDir::listSeparator().toLatin1() + path;
 +}
++
++#ifdef Q_OS_WIN
++// Where the tests fake a hung ffmpeg or ffprobe with a shebang script, which
++// Windows cannot start, hang the real tool instead: hand it this named pipe
++// as its input. It accepts the connection and never sends a byte.
++class SilentPipe {
++public:
++    SilentPipe()
++        : m_name(QStringLiteral("\\\\.\\pipe\\omacut-tests-%1")
++                     .arg(QUuid::createUuid().toString(QUuid::WithoutBraces))),
++          m_handle(CreateNamedPipeW(reinterpret_cast<const wchar_t *>(m_name.utf16()),
++                                    PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE | PIPE_WAIT,
++                                    1, 0, 0, 0, nullptr)) {}
++    ~SilentPipe() { close(); }
++    Q_DISABLE_COPY_MOVE(SilentPipe)
++
++    QString name() const { return m_name; }
++    bool isValid() const { return m_handle != INVALID_HANDLE_VALUE; }
++    // A pipe only has a client process once something has opened it. Waiting
++    // for that makes sure a test really cuts short a hang, not a tool that
++    // never got going.
++    bool waitUntilOpened() const {
++        ULONG client = 0;
++        return QTest::qWaitFor([&] { return GetNamedPipeClientProcessId(m_handle, &client) != 0; },
++                               5000);
++    }
++    // Ends the hang: the tool's next read fails, as at the end of a broken file.
++    void close() {
++        if (isValid())
++            CloseHandle(m_handle);
++        m_handle = INVALID_HANDLE_VALUE;
++    }
++
++private:
++    QString m_name;
++    HANDLE m_handle;
++};
++#endif
 +
 +// Drop an "ffmpeg" into dirPath that always fails to start, for tests that
 +// prepend dirPath to PATH.
@@ -81,7 +122,7 @@ index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29e
      QFile fake(QDir(dirPath).filePath(QStringLiteral("ffmpeg")));
      if (!fake.open(QIODevice::WriteOnly | QIODevice::Truncate))
          return false;
-@@ -296,6 +320,7 @@ bool BackendTests::installBrokenFfmpeg(const QString &dirPath) {
+@@ -387,6 +448,7 @@ bool BackendTests::installBrokenFfmpeg(const QString &dirPath) {
      fake.close();
      return fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                                 | QFileDevice::ExeOwner);
@@ -89,26 +130,62 @@ index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29e
  }
  
  void BackendTests::openDialogDelegatesToFilePicker() {
-@@ -430,6 +455,18 @@ void BackendTests::thumbProviderServesAndCachesFrames() {
+@@ -589,6 +651,12 @@ void BackendTests::probeRunsOffTheUiThread() {
+     // A slow ffprobe (a streamed file with no header duration is the real
+     // case) must not freeze the caller: load() accepts, busy() reports the
+     // probe in flight, and the refusal arrives later as a signal.
++#ifdef Q_OS_WIN
++    // The real ffprobe, stalled on a pipe until the test lets it fail.
++    SilentPipe pipe;
++    QVERIFY(pipe.isValid());
++    const QUrl url = QUrl::fromLocalFile(pipe.name());
++#else
+     const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
+     QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
+     QTemporaryDir pathDir;
+@@ -602,6 +670,8 @@ void BackendTests::probeRunsOffTheUiThread() {
+                                 | QFileDevice::ExeOwner));
+     EnvVarGuard pathGuard("PATH");
+     qputenv("PATH", QFile::encodeName(pathDir.path()));
++    const QUrl url = videoUrl();
++#endif
+ 
+     ThumbProvider provider;
+     Backend backend(&provider, new FakeFilePicker);
+@@ -609,10 +679,19 @@ void BackendTests::probeRunsOffTheUiThread() {
+ 
+     QElapsedTimer elapsed;
+     elapsed.start();
+-    QVERIFY(backend.load(videoUrl()));
++    QVERIFY(backend.load(url));
+     QVERIFY2(elapsed.elapsed() < 1000, "load() blocked on ffprobe");
+     QVERIFY(backend.busy());
+     QVERIFY(backend.source().isEmpty());
++#ifdef Q_OS_WIN
++    // Where the fake sleeps two seconds, hold ffprobe for as long, then let
++    // its read fail.
++    QVERIFY2(pipe.waitUntilOpened(), "ffprobe opened the pipe");
++    QTest::qWait(2000);
++    QVERIFY(backend.busy());
++    QCOMPARE(errorSpy.count(), 0);
++    pipe.close();
++#endif
+ 
+     QTRY_COMPARE_WITH_TIMEOUT(errorSpy.count(), 1, 10000);
+     waitForProbe(backend);
+@@ -642,6 +721,11 @@ void BackendTests::thumbProviderServesAndCachesFrames() {
  }
  
  void BackendTests::thumbProviderStopsBlockedJobs() {
 +#ifdef Q_OS_WIN
-+    // Windows cannot start the shebang script below, so it would never hang
-+    // anything. Hang the real ffmpeg instead: give it a named pipe for input
-+    // that accepts the connection and never sends a byte.
-+    const QString video = QStringLiteral("\\\\.\\pipe\\omacut-tests-%1")
-+                              .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
-+    const HANDLE pipe = CreateNamedPipeW(reinterpret_cast<const wchar_t *>(video.utf16()),
-+                                         PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE | PIPE_WAIT,
-+                                         1, 0, 0, 0, nullptr);
-+    QVERIFY(pipe != INVALID_HANDLE_VALUE);
-+    const auto closePipe = qScopeGuard([pipe] { CloseHandle(pipe); });
++    SilentPipe pipe;
++    QVERIFY(pipe.isValid());
++    const QString video = pipe.name();
 +#else
      const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
      QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
  
-@@ -445,12 +482,21 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
+@@ -657,12 +741,17 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
  
      EnvVarGuard pathGuard("PATH");
      qputenv("PATH", QFile::encodeName(pathDir.path()));
@@ -122,16 +199,45 @@ index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29e
      std::unique_ptr<QQuickImageResponse> response(
          provider->requestImageResponse(QStringLiteral("1/0"), QSize()));
 +#ifdef Q_OS_WIN
-+    // A pipe only has a client process once something has opened it. Wait for
-+    // ffmpeg to be that client, so the stop below really cuts short a hang.
-+    ULONG client = 0;
-+    QVERIFY2(QTest::qWaitFor([&] { return GetNamedPipeClientProcessId(pipe, &client) != 0; }, 5000),
-+             "ffmpeg opened the pipe");
++    QVERIFY2(pipe.waitUntilOpened(), "ffmpeg opened the pipe");
 +#endif
      QTest::qWait(100);
  
      QElapsedTimer elapsed;
-@@ -788,12 +834,17 @@ void BackendTests::exportStartFailureClearsBusy() {
+@@ -673,6 +762,11 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
+ }
+ 
+ void BackendTests::thumbProviderCancelsRunningJobs() {
++#ifdef Q_OS_WIN
++    SilentPipe pipe;
++    QVERIFY(pipe.isValid());
++    const QString video = pipe.name();
++#else
+     const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
+     QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
+ 
+@@ -688,14 +782,19 @@ void BackendTests::thumbProviderCancelsRunningJobs() {
+ 
+     EnvVarGuard pathGuard("PATH");
+     qputenv("PATH", QFile::encodeName(pathDir.path()));
++    const QString video = QStringLiteral("unused.mp4");
++#endif
+ 
+     // Cancelling a frame that scrolled off screen kills its ffmpeg instead
+     // of leaving the worker busy until the extraction would have finished.
+     ThumbProvider provider;
+-    provider.setVideo(1, QStringLiteral("unused.mp4"));
++    provider.setVideo(1, video);
+     std::unique_ptr<QQuickImageResponse> response(
+         provider.requestImageResponse(QStringLiteral("1/0"), QSize()));
+     QSignalSpy finishedSpy(response.get(), &QQuickImageResponse::finished);
++#ifdef Q_OS_WIN
++    QVERIFY2(pipe.waitUntilOpened(), "ffmpeg opened the pipe");
++#endif
+     QTest::qWait(100);
+ 
+     QElapsedTimer elapsed;
+@@ -1204,12 +1303,17 @@ void BackendTests::exportStartFailureClearsBusy() {
      QVERIFY(installBrokenFfmpeg(pathDir.path()));
  
      EnvVarGuard pathGuard("PATH");
@@ -150,7 +256,7 @@ index c949dc48acc388a0c049e71b8ee9eac19a92f73d..d4da5bfd7d2ccb23a7956ecc5c93d29e
      QTRY_COMPARE_WITH_TIMEOUT(failedSpy.count(), 1, 5000);
      QVERIFY(!backend.busy());
      QVERIFY(backend.status().isEmpty());
-@@ -825,7 +876,7 @@ void BackendTests::failedExportPreservesExistingFile() {
+@@ -1242,7 +1346,7 @@ void BackendTests::failedExportPreservesExistingFile() {
      QVERIFY(installBrokenFfmpeg(pathDir.path()));
  
      EnvVarGuard pathGuard("PATH");
