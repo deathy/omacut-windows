@@ -82,6 +82,28 @@ pwsh -File bin/prepare-source.ps1
 mkdir -p build && cd build && qmake ../work/omacut-windows.pro && make
 ```
 
+## macOS (experimental)
+
+Every CI build also produces an Apple silicon build, `omacut-*-macos-arm64.zip`,
+as the `omacut-macos-arm64` artifact of the [Build](../../actions/workflows/build.yml)
+run. It is an experiment: not released, and not tried on a real Mac as often
+as the Windows build is on Windows. It needs macOS 12 or later, and bundles
+ffmpeg the same way.
+
+It is signed ad hoc, not with an Apple Developer ID, so Gatekeeper blocks it
+on first launch ("cannot be opened" or "is damaged"). After unzipping, move
+`omacut.app` to Applications and clear the quarantine flag the browser put on it:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/omacut.app
+```
+
+or try to open it once, then choose *Open Anyway* under System Settings →
+Privacy & Security.
+
+To package one yourself after the build above, with Qt's `bin` on the `PATH`:
+`pwsh -File bin/package-macos.ps1 -Version local`.
+
 ## How releases track upstream
 
 Releases here are tagged `win-v0.5.0` and so on, deliberately clear of

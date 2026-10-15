@@ -245,6 +245,36 @@ patch, and drop the patch if they do.
 `pkgbuild/omacut.ico`. Gives `omacut.exe` its icon and its version-info
 strings. Nothing in upstream's files changes.
 
+### 9. macOS (experimental)
+
+*Overlay only:* the `macx {}` block in `omacut-windows.pro` and
+`pkgbuild/omacut.icns`. *Packaging:* `bin/fetch-ffmpeg-macos.ps1`,
+`bin/package-macos.ps1`, the `macos` job in `.github/workflows/build.yml`.
+
+**Why.** Nothing in sections 1 to 7 is Windows-only in effect: each is either
+guarded by `Q_OS_WIN`/`Q_OS_LINUX` or holds on any non-Linux desktop. The
+QFileDialog picker shows the native macOS panels, `toolPath()` finds ffmpeg in
+`Contents/MacOS` (the `applicationDirPath()` of an app bundle), and the
+hardware decoder list is left to Qt, which means VideoToolbox. So a macOS
+build is packaging and nothing more, and stays that way: **no patch is
+macOS-specific**. If one ever has to be, say so here first.
+
+**What.** The `macx {}` block gives the bundle an icon and an identifier.
+`omacut.icns` is upstream's `pkgbuild/omacut.svg` drawn at 880 px on a
+1024 px canvas, which puts the icon's body on the size Apple's icon grid
+expects (824 px) so that it sits right next to other apps in the Dock.
+`package-macos.ps1` runs `macdeployqt`, adds Martin Riedl's static arm64
+ffmpeg and ffprobe (pinned by hash; they link only system frameworks),
+checks that every Mach-O file in the bundle loads only the OS and the
+bundle, signs it ad hoc, and starts it offscreen for a few seconds before
+zipping it with `ditto`. CI uploads that zip before running the test suites,
+so a macOS-only test failure does not cost the app.
+
+Apple silicon only, and not released: there is no `macos` job in
+`release.yml` yet. Before adding one, try a CI build on a real Mac the way
+the checklist below says for Windows, including that the export quality
+choices show in the save panel's format popup.
+
 ### Not changes, but differences users see
 
 - The accent colour is upstream's default amber. Upstream reads it from the

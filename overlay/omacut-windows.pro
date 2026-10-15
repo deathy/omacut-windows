@@ -1,6 +1,6 @@
 # The project file the Windows build uses. It takes upstream's omacut.pro as it
 # is and adjusts it from outside, so upstream's file never needs patching.
-# See PORT.md, "File picker" and "Windows executable metadata".
+# See PORT.md, "File picker", "Windows executable metadata" and "macOS".
 
 include(omacut.pro)
 
@@ -25,4 +25,11 @@ win32 {
     QMAKE_TARGET_PRODUCT = omacut
     QMAKE_TARGET_DESCRIPTION = Dead-simple video length trimmer
     QMAKE_TARGET_COPYRIGHT = MIT
+}
+
+# The experimental macOS build. qmake makes omacut.app on its own; this gives
+# it an icon and an identifier that isn't qmake's com.yourcompany placeholder.
+macx {
+    ICON = $$PWD/pkgbuild/omacut.icns
+    QMAKE_TARGET_BUNDLE_PREFIX = io.github.deathy
 }
