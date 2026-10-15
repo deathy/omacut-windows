@@ -84,12 +84,21 @@ the native Windows dialogs:
 - `src/main.cpp`: `QFileDialog` is a widget, so the application object must be
   a `QApplication`, not a `QGuiApplication`. Change both the include and the
   object.
+- `tests/backend_tests.cpp`: upstream tests `PortalFilePicker` itself
+  (`portalPickerReplacesAnUnansweredRequest`, since v0.7.2), against a fake
+  portal on a private D-Bus. The Windows test build has neither the picker
+  nor D-Bus, so everything that needs them (the `QDBus*` and
+  `portalfilepicker.h` includes, `FakePortalRequest`, `FakePortalService`,
+  the test's body) goes under `#ifndef OMACUT_NO_PORTAL_PICKER`, and the test
+  `QSKIP`s with the reason instead. Do the same for any later portal test.
 
 **From outside** (overlay, no patch): `omacut-windows.pro` and
 `tests/backend_tests-windows.pro` include upstream's project files, then swap
 `portalfilepicker.*` and the `dbus` module for `dialogfilepicker.*` and
 `widgets`. They stop with an error if upstream's project file no longer lists
 `portalfilepicker.cpp`, because otherwise the `-=` would quietly do nothing.
+`backend_tests-windows.pro` also defines `OMACUT_NO_PORTAL_PICKER`, which
+the test patch above keys on.
 
 **Still right when:** the build has no D-Bus dependency, and
 `dialogfilepicker_tests` passes.
@@ -173,8 +182,13 @@ without testing anything, and only where a `sleep` happened to be on the
 PATH. On Windows the port now hangs the *real* ffmpeg instead: its input is
 a named pipe (`CreateNamedPipeW`) that never sends a byte. The test then
 waits until ffmpeg has opened the pipe (`GetNamedPipeClientProcessId`)
-before timing the stop. Use the same trick for any future test that needs a
-hung ffmpeg.
+before timing the stop. The patch wraps this in a `SilentPipe` helper in
+`tests/backend_tests.cpp`, which `thumbProviderCancelsRunningJobs` uses the
+same way. `probeRunsOffTheUiThread` uses it for a slow ffprobe: where the
+fake sleeps two seconds and exits, the test holds ffprobe on the pipe for
+two seconds, checks that nothing has finished yet, and then closes the pipe
+so that the probe fails. Use `SilentPipe` for any future test that needs a
+hung or slow ffmpeg or ffprobe.
 
 ### 6. Play videos whose names need escaping
 
@@ -256,7 +270,8 @@ and look in the new code for:
 
 - new uses of `std::rename`, or other POSIX-only file handling (section 2);
 - tools found by anything other than `ffmpeg::toolPath()` (section 3);
-- D-Bus, the portal, or new Linux-only sources in `omacut.pro` (section 1);
+- D-Bus, the portal, or new Linux-only sources in `omacut.pro`, and tests
+  that use either (section 1);
 - Linux-only environment tweaks in `main()` (section 4);
 - new tests that use `':'` in PATH, `#!` fakes, `setPermissions(ExeOwner)`,
   `sleep`/`sh`, or that assume an asynchronous process failure (section 5);

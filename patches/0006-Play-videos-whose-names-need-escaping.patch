@@ -23,10 +23,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  2 files changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 008923844f0f96b46bbd9ed2b7ec27dce44c814f..2f39bcbba95024a4a576a5690cf82ea21d64823e 100644
+index 86da2edc358f23ecaa9e85fd65cd42c224ff844b..d831ee4c0cb76a87d72637db5de86353ddff16d6 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -193,8 +193,13 @@ bool Backend::isVideoPath(const QString &path) const {
+@@ -203,8 +203,13 @@ bool Backend::isVideoPath(const QString &path) const {
  
  QVariantList Backend::videoList() const {
      QVariantList result;
@@ -42,19 +42,19 @@ index 008923844f0f96b46bbd9ed2b7ec27dce44c814f..2f39bcbba95024a4a576a5690cf82ea2
      return result;
  }
 diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
-index d4da5bfd7d2ccb23a7956ecc5c93d29eb712acf3..cea2e412572a92ab724f01c061da71b6d8dd28bd 100644
+index 0a14b7a8a9e2364286137d89df5f8eee29794478..d3a507d1bbe9cc8914572c37c84e411abd285f81 100644
 --- a/tests/backend_tests.cpp
 +++ b/tests/backend_tests.cpp
-@@ -20,6 +20,8 @@
+@@ -27,6 +27,8 @@
  
  #include <memory>
  
 +#include <QMediaPlayer>
 +
  #ifdef Q_OS_WIN
- #include <QScopeGuard>
  #include <QUuid>
-@@ -216,6 +218,7 @@ private slots:
+ #define NOMINMAX
+@@ -295,6 +297,7 @@ private slots:
      void exportStartFailureClearsBusy();
      void failedExportPreservesExistingFile();
      void qmlDoesNotCreateAudioOutputWithoutVideo();
@@ -62,7 +62,7 @@ index d4da5bfd7d2ccb23a7956ecc5c93d29eb712acf3..cea2e412572a92ab724f01c061da71b6
      void qmlShortcutsTriggerBackendActions();
      void qmlArrowKeysMoveThePlayhead();
      void qmlNumberKeysJumpThroughTheEdit();
-@@ -897,6 +900,33 @@ void BackendTests::qmlDoesNotCreateAudioOutputWithoutVideo() {
+@@ -1367,6 +1370,33 @@ void BackendTests::qmlDoesNotCreateAudioOutputWithoutVideo() {
      QCOMPARE(harness.window()->property("audioOutputReady").toBool(), false);
  }
  

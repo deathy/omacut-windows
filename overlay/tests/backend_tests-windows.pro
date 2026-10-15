@@ -14,6 +14,9 @@ QT      += widgets
 HEADERS += ../src/dialogfilepicker.h
 SOURCES += ../src/dialogfilepicker.cpp
 
+# Leaves out the tests of the portal picker, which this build doesn't have.
+DEFINES += OMACUT_NO_PORTAL_PICKER
+
 # qmake builds a GUI-subsystem binary on Windows by default, which detaches
 # stdout -- QtTest's results would go nowhere.
 win32: CONFIG += console

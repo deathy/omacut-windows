@@ -15,17 +15,17 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 9 insertions(+)
 
 diff --git a/src/ffmpeg.cpp b/src/ffmpeg.cpp
-index b6a19fb80d7e1c2ad2a3ea9a5eeb02f1c8673a2d..80733f17be0760b4d947d157d634ab0a14518320 100644
+index c74788fdbe8637b719bc9b7d5184ac80ea0cb583..d7d3218a988a4dd72a95287a4dec4872d99edb13 100644
 --- a/src/ffmpeg.cpp
 +++ b/src/ffmpeg.cpp
 @@ -1,5 +1,6 @@
  #include "ffmpeg.h"
  
 +#include <QCoreApplication>
+ #include <QElapsedTimer>
  #include <QJsonArray>
  #include <QJsonDocument>
- #include <QJsonObject>
-@@ -17,6 +18,14 @@ constexpr int kThumbPollMs = 50;
+@@ -65,6 +66,14 @@ double probePacketDuration(const QString &ffprobe, const QString &path, int stre
  }
  
  QString toolPath(const QString &tool) {
