@@ -68,6 +68,12 @@ $macdeployqt = Get-Command 'macdeployqt' -ErrorAction SilentlyContinue
 if (-not $macdeployqt) { throw 'macdeployqt was not found on the PATH' }
 Invoke-Native $macdeployqt.Source $app "-qmldir=$(Join-Path $SourceDir 'src')" -always-overwrite -verbose=1
 
+# macdeployqt brings in every SQL driver plugin, and the ODBC, PostgreSQL and
+# Mimer ones load client libraries the user would have to install. omacut
+# opens no database (windeployqt ships no sqldrivers either), so drop them all.
+$sqldrivers = Join-Path $app 'Contents/PlugIns/sqldrivers'
+if (Test-Path $sqldrivers) { Remove-Item -Recurse -Force $sqldrivers }
+
 if (-not $SkipFfmpeg) {
     & (Join-Path $PSScriptRoot 'fetch-ffmpeg-macos.ps1') -Destination $macos -InfoDir $res
 }
