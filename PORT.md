@@ -216,7 +216,30 @@ build has it depends on the Qt version there. If upstream compares these URLs
 some other way, or stops passing `QUrl`s through `videoList()`, check whether
 the test still passes without this patch, and drop the patch if it does.
 
-### 7. Windows executable metadata
+### 7. Add every video of a drop
+
+*Patch:* `Add every video of a drop on Qt 6.8`.
+
+**Why.** Since v0.7.2, `Main.qml`'s `dropVideos()` hands the drop's whole
+url list to `Backend::addVideos(const QVariantList &, double)`. On Qt 6.8
+each entry arrives as a `QVariant` holding a `QVariant` that holds the
+`QUrl`, and `toUrl()` on the outer one gives an empty url. `checkedPath()`
+then refused every file as not a local path, so dropping files on the
+window never opened or added anything. This is section 6's problem in the
+other direction, from QML to C++.
+
+**What.** In `addVideos()`, read each entry through
+`qvariant_cast<QVariant>(value).toUrl()`. That unwraps the extra level and
+leaves an entry that holds the `QUrl` directly as it is. The upstream tests
+`qmlDropOpensThenAddsVideos` and `qmlDropLandsAfterThePlayheadsClip` fail
+without it.
+
+**When to drop it.** As for section 6: this depends on the Qt version, not
+on Windows. If upstream changes `addVideos()` to take a `QList<QUrl>` or
+unwraps the entries itself, check whether the drop tests pass without this
+patch, and drop the patch if they do.
+
+### 8. Windows executable metadata
 
 *Overlay only:* the `win32 {}` block in `omacut-windows.pro` and
 `pkgbuild/omacut.ico`. Gives `omacut.exe` its icon and its version-info
@@ -279,7 +302,10 @@ and look in the new code for:
   be a `QApplication`;
 - URLs compared as text in QML, or new `QUrl`s handed to QML inside a
   `QVariantMap`/`QVariantList`, which print differently from `url`
-  properties (section 6).
+  properties (section 6);
+- new `Q_INVOKABLE`s taking a `QVariant`, `QVariantList` or `QVariantMap`
+  that QML fills with urls or other values that may arrive wrapped in an
+  extra `QVariant` (section 7).
 
 Then build and test it on Windows (`check-local.ps1`, and CI on the pull
 request), and try the build artifact on a Windows machine. Use a video whose
@@ -295,7 +321,7 @@ Remove-Item patches/*.patch
 pwsh -File bin/prepare-source.ps1 -Ref vX.Y.Z   # upstream + overlay, no patches
 ```
 
-Then, in `work/`, carry out sections 1 to 6 against the code as it now is. Make one
+Then, in `work/`, carry out sections 1 to 7 against the code as it now is. Make one
 commit per section with a message that explains the why, as the existing
 patches do. Then run `export-patches.ps1`, update `UPSTREAM_VERSION`, and
 go through the checklist above. If upstream has reworked something so far
