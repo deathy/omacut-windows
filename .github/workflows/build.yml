@@ -112,3 +112,86 @@ jobs:
           name: omacut-win64
           path: dist/*.zip
           if-no-files-found: error
+
+  # Experimental: the same port, built as an Apple silicon .app. Nothing in
+  # the source is macOS-specific; this is packaging and CI only. See PORT.md,
+  # "macOS".
+  macos:
+    # Not macos-latest: Qt 6.8.1 supports the macOS 15 SDK, and its headers
+    # stop compiling under Xcode 26 (qyieldcpu.h calls an undeclared
+    # __yield). Moving off 6.8.1 would mean leaving the Qt the Windows build
+    # and patches 6 and 7 are written against.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use the Xcode Qt 6.8.1 supports
+        run: |
+          xcode="$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          if [ -z "$xcode" ]; then echo "No Xcode 16 on this runner"; ls -d /Applications/Xcode*; exit 1; fi
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Prepare source
+        shell: pwsh
+        run: ./bin/prepare-source.ps1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.1'
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtmultimedia
+          cache: true
+
+      - name: Build omacut
+        run: |
+          mkdir build && cd build
+          qmake "$GITHUB_WORKSPACE/work/omacut-windows.pro"
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Package
+        run: pwsh -File bin/package-macos.ps1 -Version "ci-${GITHUB_SHA::7}"
+
+      # Uploaded before the tests run, unlike on Windows: while this build is
+      # an experiment, a test that fails on macOS for reasons of its own
+      # should not cost the app to try by hand. The job still goes red.
+      - name: Upload build
+        uses: actions/upload-artifact@v7
+        with:
+          name: omacut-macos-arm64
+          path: dist/*.zip
+          if-no-files-found: error
+
+      # Absolute .pro paths, for the same reason as on Windows.
+      - name: Build tests
+        run: |
+          mkdir build-tests && cd build-tests
+          qmake "$GITHUB_WORKSPACE/work/tests/backend_tests-windows.pro"
+          make -j"$(sysctl -n hw.ncpu)"
+          cd ..
+          mkdir build-tests-picker && cd build-tests-picker
+          qmake "$GITHUB_WORKSPACE/work/tests/dialogfilepicker_tests.pro"
+          make -j"$(sysctl -n hw.ncpu)"
+
+      # The backend tests shell out to a real ffmpeg. Use the one just
+      # bundled into the app, so the tests run against what ships.
+      - name: Put the bundled ffmpeg on the PATH
+        run: |
+          dir="$(echo "$GITHUB_WORKSPACE"/dist/omacut-*-macos-arm64/omacut.app/Contents/MacOS)"
+          "$dir/ffmpeg" -hide_banner -version | head -1
+          echo "$dir" >> "$GITHUB_PATH"
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          failed=""
+          for t in build-tests/backend_tests build-tests-picker/dialogfilepicker_tests; do
+            echo "== $t =="
+            # From the directory qmake ran in, as on Windows.
+            (cd "$(dirname "$t")" && "./$(basename "$t")") || failed="$failed $t"
+          done
+          if [ -n "$failed" ]; then echo "Failing suites:$failed"; exit 1; fi
