@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: omacut-windows prepare-source <prepare-source@omacut-windows.invalid>
+Date: Tue, 17 Nov 2026 14:57:01 +0200
+Subject: [PATCH] Let go of a replaced dialog button's letter at once
+
+The quit question's buttons depend on whether an export is running, so
+when an export ends the Repeater replaces them. On Qt 6.8 the replaced
+buttons are destroyed but only freed on a later turn of the event loop,
+and until then their mnemonic Shortcut stays registered and enabled. The
+old Quit button's Q and the window's own Q are then ambiguous, so a Q
+pressed right after an export finishes quits nothing.
+
+Clear the Shortcut's sequences when the button is destroyed, which takes
+them out of the shortcut map straight away.
+
+qmlQuitAsksWhileExporting fails without this.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/DialogButton.qml | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/DialogButton.qml b/src/DialogButton.qml
+index 9ff85962a22d779237dc9ce4cb29e2c8130b205e..dd0425cf95db8089a2196eabe92ca41c68c87d0b 100644
+--- a/src/DialogButton.qml
++++ b/src/DialogButton.qml
+@@ -45,7 +45,13 @@ Button {
+             : control.primary ? Qt.darker(theme.accent, 1.15) : "#3a3a3e"
+     }
+     HoverHandler { cursorShape: Qt.PointingHandCursor }
++    // A button the Repeater replaces (the quit question's buttons change with
++    // the export) is destroyed, but on Qt 6.8 it is freed, and its letter
++    // let go, only on a later turn of the event loop. Until then the old Quit
++    // button's Q makes the window's own Q ambiguous, and neither fires.
++    Component.onDestruction: mnemonicShortcut.sequences = []
+     Shortcut {
++        id: mnemonicShortcut
+         sequences: [control.mnemonic, "Alt+" + control.mnemonic]
+         enabled: control.visible && control.mnemonic !== ""
+         context: Qt.ApplicationShortcut

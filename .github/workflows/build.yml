@@ -30,29 +30,14 @@ jobs:
 
       - uses: ./.github/actions/setup-windows-build
 
-      - name: Build omacut
+      # omacut and both test suites, with upstream's CMakeLists.txt adjusted
+      # from outside by overlay/port/omacut-port.cmake (see PORT.md). vcvars
+      # also puts the CMake and Ninja that come with MSVC on the PATH.
+      - name: Build omacut and the tests
         shell: cmd
         run: |
           call "%VCVARS%" || exit /b 1
-          mkdir build && cd build
-          qmake "%GITHUB_WORKSPACE%\work\omacut-windows.pro" || exit /b 1
-          nmake || exit /b 1
-
-      # Absolute .pro paths, so __FILE__ comes out absolute in the binary --
-      # the QML tests locate Main.qml relative to it, and a relative path there
-      # resolves against the working directory instead. This is what upstream's
-      # own bin/test does.
-      - name: Build tests
-        shell: cmd
-        run: |
-          call "%VCVARS%" || exit /b 1
-          mkdir build-tests && cd build-tests
-          qmake "%GITHUB_WORKSPACE%\work\tests\backend_tests-windows.pro" || exit /b 1
-          nmake || exit /b 1
-          cd ..
-          mkdir build-tests-picker && cd build-tests-picker
-          qmake "%GITHUB_WORKSPACE%\work\tests\dialogfilepicker_tests.pro" || exit /b 1
-          nmake || exit /b 1
+          pwsh -File bin/build-cmake.ps1 || exit /b 1
 
       - name: Install ffmpeg for the test run
         shell: pwsh
@@ -69,31 +54,24 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           $failed = @()
-          foreach ($dir in 'build-tests', 'build-tests-picker') {
-            $exe = Get-ChildItem -Path $dir -Recurse -File -Filter '*_tests.exe' |
-                   Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if (-not $exe) { throw "No test binary was built in $dir" }
-            Write-Host "== $($exe.Name) =="
+          foreach ($suite in 'omacut_tests', 'dialogfilepicker_tests') {
+            $exe = Join-Path build "$suite.exe"
+            if (-not (Test-Path $exe)) { throw "No $suite.exe was built" }
+            Write-Host "== $suite =="
 
-            # Run from the directory qmake ran in, the way upstream's bin/test
-            # does: qmake leaves __FILE__ relative in a shadow build, and the
-            # QML tests locate Main.qml relative to it.
-            $log = Join-Path $PWD "$($exe.BaseName).txt"
-            Push-Location $dir
-            try {
-              # QtTest's stdout arrives empty on this runner however it is
-              # captured; its own file logger is a different path out.
-              & $exe.FullName -o "$log,txt"
-              $code = $LASTEXITCODE
-            } finally { Pop-Location }
+            # QtTest's stdout arrives empty on this runner however it is
+            # captured; its own file logger is a different path out.
+            $log = Join-Path $PWD "$suite.txt"
+            & $exe -o "$log,txt"
+            $code = $LASTEXITCODE
 
             if (Test-Path $log) {
               Get-Content $log | ForEach-Object { Write-Host $_ }
             } else {
               Write-Host "QtTest wrote no log file either"
             }
-            Write-Host "$($exe.Name) exited with $code"
-            if ($code -ne 0) { $failed += "$($exe.Name) ($code)" }
+            Write-Host "$suite exited with $code"
+            if ($code -ne 0) { $failed += "$suite ($code)" }
           }
           if ($failed.Count) { throw "Failing suites: $($failed -join ', ')" }
 
