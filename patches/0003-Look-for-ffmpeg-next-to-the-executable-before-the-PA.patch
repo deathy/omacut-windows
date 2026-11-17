@@ -11,21 +11,14 @@ the PATH for a developer build that bundles nothing.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/ffmpeg.cpp | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ src/ffmpeg.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/src/ffmpeg.cpp b/src/ffmpeg.cpp
-index c74788fdbe8637b719bc9b7d5184ac80ea0cb583..d7d3218a988a4dd72a95287a4dec4872d99edb13 100644
+index cb09be992b35a6272a7ce22c5f24bc7e38cafcf5..057c82d0cc8d69d1384b98a62a8f3736e7313be1 100644
 --- a/src/ffmpeg.cpp
 +++ b/src/ffmpeg.cpp
-@@ -1,5 +1,6 @@
- #include "ffmpeg.h"
- 
-+#include <QCoreApplication>
- #include <QElapsedTimer>
- #include <QJsonArray>
- #include <QJsonDocument>
-@@ -65,6 +66,14 @@ double probePacketDuration(const QString &ffprobe, const QString &path, int stre
+@@ -69,6 +69,14 @@ double probePacketDuration(const QString &ffprobe, const QString &path, int stre
  }
  
  QString toolPath(const QString &tool) {

@@ -15,19 +15,20 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 4 insertions(+)
 
 diff --git a/src/main.cpp b/src/main.cpp
-index b30752e1c5ac34f0eae582c6574af11e98f90daa..eca890db2dcc0c4489512c5548e05654d50ebc96 100644
+index a185c850664c3606a5e83eecd797cc950664a871..7fc8b94733c7ab889fa14618a0e6799578934aa2 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -18,8 +18,12 @@ int main(int argc, char *argv[]) {
-     // and on GPUs without Vulkan decode queues it then picks ffmpeg's hwaccel-only
-     // av1 decoder and never falls back to dav1d, leaving the preview black. Stick
+@@ -22,9 +22,13 @@ int main(int argc, char *argv[]) {
      // to the backends Qt checks codec support for, so software decode kicks in.
+     // On NVIDIA, VA-API means nvidia-vaapi-driver, whose vaSyncSurface never
+     // returns when the render thread maps a frame, freezing the whole window.
 +    // Linux only: the list replaces Qt's own, and elsewhere that would drop the
 +    // platform's decoder (D3D11 on Windows, VideoToolbox on macOS).
 +#ifdef Q_OS_LINUX
      if (!qEnvironmentVariableIsSet("QT_FFMPEG_DECODING_HW_DEVICE_TYPES"))
-         qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", "vaapi,cuda");
+         qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES",
+                 QFileInfo::exists("/sys/module/nvidia") ? "cuda" : "vaapi,cuda");
 +#endif
  
-     QApplication app(argc, argv);
-     app.setApplicationName("omacut");
+     // Exports run through the ffmpeg CLI, so Qt never encodes. Without this, Qt
+     // probes every hardware encoder backend when it loads, which takes about two

@@ -17,10 +17,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 14 insertions(+)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 665182ca909222e31b1cd81825e0d1d9155a622e..86da2edc358f23ecaa9e85fd65cd42c224ff844b 100644
+index 2d8091d5819b671024f2f38c13a74573b97a6f56..2aa84186e7253cb698d369551a20b323536335e2 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -18,6 +18,10 @@
+@@ -16,6 +16,10 @@
  #include <memory>
  #include <utility>
  
@@ -31,7 +31,7 @@ index 665182ca909222e31b1cd81825e0d1d9155a622e..86da2edc358f23ecaa9e85fd65cd42c2
  #include "filepicker.h"
  #include "dialogfilepicker.h"
  #include "thumbprovider.h"
-@@ -45,9 +49,19 @@ QString mp4PathFor(const QString &path) {
+@@ -33,9 +37,19 @@ QString mp4PathFor(const QString &path) {
  }
  
  bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {

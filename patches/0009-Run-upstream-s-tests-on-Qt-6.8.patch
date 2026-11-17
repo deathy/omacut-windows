@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: omacut-windows prepare-source <prepare-source@omacut-windows.invalid>
+Date: Tue, 17 Nov 2026 14:57:02 +0200
+Subject: [PATCH] Run upstream's tests on Qt 6.8
+
+Upstream tests against Arch's Qt, which is newer than the 6.8 the port
+builds with. Two of its tests rely on what only the newer Qt does:
+
+- dropUrls() builds a QDragEnterEvent from a QPointF, a constructor Qt
+  6.8 does not have. The point is a whole pixel anyway, so pass it as a
+  QPoint.
+- qmlTimelineViewDependsOnlyOnTheEdit compares a grab of the edited bar
+  with a fresh editor's. Qt 6.8's software renderer, which the tests run
+  on offscreen, can keep a node from before an edit on screen until the
+  bar's geometry changes, so the grab showed a clip frame that the scene
+  no longer held. Hiding and showing the bar before the grab rebuilds its
+  nodes. What the test compares is unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ tests/omacut_tests.cpp | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/tests/omacut_tests.cpp b/tests/omacut_tests.cpp
+index 00610ec1709c91681d387d78da6c19e1ade9502a..9b18ed67c167eb78b8550b05f09a1508a5dab0e0 100644
+--- a/tests/omacut_tests.cpp
++++ b/tests/omacut_tests.cpp
+@@ -3337,7 +3337,8 @@ static bool dropUrls(QQuickWindow *window, const QList<QUrl> &urls) {
+     QMimeData mime;
+     mime.setUrls(urls);
+     const QPointF point(window->width() / 2, window->height() / 3);
+-    QDragEnterEvent enter(point, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
++    // Qt 6.8 has only a QPoint constructor for this one; the point is whole anyway.
++    QDragEnterEvent enter(point.toPoint(), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+     QCoreApplication::sendEvent(window, &enter);
+     if (!enter.isAccepted()) {
+         QDragLeaveEvent leave;
+@@ -3652,6 +3653,14 @@ public:
+             v.frames << videoOf.value(prefix, prefix) + frame.mid(prefix.size());
+         }
+         v.frames.sort();
++        // Qt 6.8's software renderer, which these tests run on, can keep a
++        // node from before an edit on screen until the bar's geometry changes:
++        // a clip's frame where no clip is any more. Rebuilding the bar's nodes
++        // first makes the picture show what the scene holds.
++        bar->setVisible(false);
++        QTest::qWait(20);
++        bar->setVisible(true);
++        QTest::qWait(20);
+         const QImage whole = window->grabWindow();
+         const qreal scale = whole.devicePixelRatio();
+         const QRectF rect = bar->mapRectToScene(QRectF(0, 0, bar->width(), bar->height()));

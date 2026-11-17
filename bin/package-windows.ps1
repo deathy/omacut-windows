@@ -32,8 +32,9 @@ if (-not $SourceDir) { $SourceDir = Join-Path $root 'work' }
 $name  = "omacut-$Version-win64"
 $stage = Join-Path $OutDir $name
 
-# The MSVC mkspec keeps debug_and_release on, so the binary may be in build\ or
-# build\release\. Take the newest, ignoring anything already staged.
+# bin\build-cmake.ps1 leaves it at the top of build\; search below that anyway,
+# so a build made some other way packages too. Take the newest, ignoring
+# anything already staged.
 $exe = Get-ChildItem -Path $BuildDir -Recurse -File -Filter 'omacut.exe' -ErrorAction SilentlyContinue |
        Where-Object { $_.FullName -notlike "$OutDir*" } |
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
