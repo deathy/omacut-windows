@@ -13,16 +13,18 @@ builds with. Two of its tests rely on what only the newer Qt does:
   with a fresh editor's. Qt 6.8's software renderer, which the tests run
   on offscreen, can keep a node from before an edit on screen until the
   bar's geometry changes, so the grab showed a clip frame that the scene
-  no longer held. Hiding and showing the bar before the grab rebuilds its
-  nodes. What the test compares is unchanged.
+  no longer held. Hiding the bar, grabbing once, and showing it again
+  rebuilds its nodes. The grab matters: it renders a frame while the bar
+  is hidden, which a fixed wait did not always do on a slower machine
+  (the macOS runner). What the test compares is unchanged.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- tests/omacut_tests.cpp | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ tests/omacut_tests.cpp | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/tests/omacut_tests.cpp b/tests/omacut_tests.cpp
-index 41512de2daaa46f3f3ae14aa953d05930e1bf661..fa60c7ce2fcfabde10b1a345d2e376b23044f7a6 100644
+index 41512de2daaa46f3f3ae14aa953d05930e1bf661..2c310931da147a05b67b75a3dceabbd1e294fcfe 100644
 --- a/tests/omacut_tests.cpp
 +++ b/tests/omacut_tests.cpp
 @@ -3600,7 +3600,8 @@ static bool dropUrls(QQuickWindow *window, const QList<QUrl> &urls) {
@@ -35,18 +37,19 @@ index 41512de2daaa46f3f3ae14aa953d05930e1bf661..fa60c7ce2fcfabde10b1a345d2e376b2
      QCoreApplication::sendEvent(window, &enter);
      if (!enter.isAccepted()) {
          QDragLeaveEvent leave;
-@@ -3923,6 +3924,14 @@ public:
+@@ -3923,6 +3924,15 @@ public:
              v.frames << videoOf.value(prefix, prefix) + frame.mid(prefix.size());
          }
          v.frames.sort();
 +        // Qt 6.8's software renderer, which these tests run on, can keep a
 +        // node from before an edit on screen until the bar's geometry changes:
 +        // a clip's frame where no clip is any more. Rebuilding the bar's nodes
-+        // first makes the picture show what the scene holds.
++        // first makes the picture show what the scene holds. That takes a
++        // frame rendered while the bar is hidden, and a grab renders one then
++        // and there; a fixed wait was not always long enough on a slow machine.
 +        bar->setVisible(false);
-+        QTest::qWait(20);
++        (void)window->grabWindow();
 +        bar->setVisible(true);
-+        QTest::qWait(20);
          const QImage whole = window->grabWindow();
          const qreal scale = whole.devicePixelRatio();
          const QRectF rect = bar->mapRectToScene(QRectF(0, 0, bar->width(), bar->height()));

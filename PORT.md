@@ -311,8 +311,12 @@ port builds with, and some of its tests use what only the newer Qt has:
   was any more, while the scene itself matched the fresh editor's.
 
 **What.** Pass `dropUrls()`'s point as a `QPoint`; it is a whole pixel
-anyway. In `EditorUnderTest::view()`, hide and show the bar just before the
-grab, which rebuilds its scene graph nodes. What either test asserts does not
+anyway. In `EditorUnderTest::view()`, just before the grab, hide the bar,
+grab the window once, and show the bar again, which rebuilds its scene graph
+nodes. The throwaway grab is what makes that certain: it renders a frame
+while the bar is hidden. A fixed wait there instead (20 ms, the first
+version of this) was usually enough on Windows but not on the slower macOS
+runner, where the stale frame then failed a different seed on each run. What either test asserts does not
 change. As with section 5, adapt tests like these rather than the code under
 test.
 
