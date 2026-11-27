@@ -35,15 +35,15 @@ run everywhere.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- tests/backend_tests.cpp | 118 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 111 insertions(+), 7 deletions(-)
+ tests/omacut_tests.cpp | 129 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 122 insertions(+), 7 deletions(-)
 
-diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
-index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee29794478 100644
---- a/tests/backend_tests.cpp
-+++ b/tests/backend_tests.cpp
-@@ -27,6 +27,12 @@
- 
+diff --git a/tests/omacut_tests.cpp b/tests/omacut_tests.cpp
+index 7aa16d1578c3b8d3ddd84ee8bcc2fc09a1334e37..8953738e49b09766ceeceefc36e0e4b7d9e98065 100644
+--- a/tests/omacut_tests.cpp
++++ b/tests/omacut_tests.cpp
+@@ -34,6 +34,12 @@
+ #include <cstdio>
  #include <memory>
  
 +#ifdef Q_OS_WIN
@@ -55,7 +55,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
  #include "backend.h"
  #include "filepicker.h"
  #ifndef OMACUT_NO_PORTAL_PICKER
-@@ -377,9 +383,64 @@ QString BackendTests::formatName(const QString &path) const {
+@@ -486,9 +492,64 @@ QString BackendTests::formatName(const QString &path) const {
      return QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
  }
  
@@ -122,7 +122,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      QFile fake(QDir(dirPath).filePath(QStringLiteral("ffmpeg")));
      if (!fake.open(QIODevice::WriteOnly | QIODevice::Truncate))
          return false;
-@@ -387,6 +448,7 @@ bool BackendTests::installBrokenFfmpeg(const QString &dirPath) {
+@@ -496,6 +557,7 @@ bool BackendTests::installBrokenFfmpeg(const QString &dirPath) {
      fake.close();
      return fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                                 | QFileDevice::ExeOwner);
@@ -130,7 +130,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
  }
  
  void BackendTests::openDialogDelegatesToFilePicker() {
-@@ -589,6 +651,12 @@ void BackendTests::probeRunsOffTheUiThread() {
+@@ -698,6 +760,12 @@ void BackendTests::probeRunsOffTheUiThread() {
      // A slow ffprobe (a streamed file with no header duration is the real
      // case) must not freeze the caller: load() accepts, busy() reports the
      // probe in flight, and the refusal arrives later as a signal.
@@ -143,7 +143,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
      QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
      QTemporaryDir pathDir;
-@@ -602,6 +670,8 @@ void BackendTests::probeRunsOffTheUiThread() {
+@@ -711,6 +779,8 @@ void BackendTests::probeRunsOffTheUiThread() {
                                  | QFileDevice::ExeOwner));
      EnvVarGuard pathGuard("PATH");
      qputenv("PATH", QFile::encodeName(pathDir.path()));
@@ -152,7 +152,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
  
      ThumbProvider provider;
      Backend backend(&provider, new FakeFilePicker);
-@@ -609,10 +679,19 @@ void BackendTests::probeRunsOffTheUiThread() {
+@@ -718,10 +788,19 @@ void BackendTests::probeRunsOffTheUiThread() {
  
      QElapsedTimer elapsed;
      elapsed.start();
@@ -173,7 +173,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
  
      QTRY_COMPARE_WITH_TIMEOUT(errorSpy.count(), 1, 10000);
      waitForProbe(backend);
-@@ -642,6 +721,11 @@ void BackendTests::thumbProviderServesAndCachesFrames() {
+@@ -751,6 +830,11 @@ void BackendTests::thumbProviderServesAndCachesFrames() {
  }
  
  void BackendTests::thumbProviderStopsBlockedJobs() {
@@ -185,7 +185,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
      QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
  
-@@ -657,12 +741,17 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
+@@ -766,12 +850,17 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
  
      EnvVarGuard pathGuard("PATH");
      qputenv("PATH", QFile::encodeName(pathDir.path()));
@@ -204,7 +204,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      QTest::qWait(100);
  
      QElapsedTimer elapsed;
-@@ -673,6 +762,11 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
+@@ -782,6 +871,11 @@ void BackendTests::thumbProviderStopsBlockedJobs() {
  }
  
  void BackendTests::thumbProviderCancelsRunningJobs() {
@@ -216,7 +216,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      const QString sleepBin = QStandardPaths::findExecutable(QStringLiteral("sleep"));
      QVERIFY2(!sleepBin.isEmpty(), "sleep is available");
  
-@@ -688,14 +782,19 @@ void BackendTests::thumbProviderCancelsRunningJobs() {
+@@ -797,14 +891,19 @@ void BackendTests::thumbProviderCancelsRunningJobs() {
  
      EnvVarGuard pathGuard("PATH");
      qputenv("PATH", QFile::encodeName(pathDir.path()));
@@ -237,7 +237,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      QTest::qWait(100);
  
      QElapsedTimer elapsed;
-@@ -1204,12 +1303,17 @@ void BackendTests::exportStartFailureClearsBusy() {
+@@ -1417,12 +1516,17 @@ void BackendTests::exportStartFailureClearsBusy() {
      QVERIFY(installBrokenFfmpeg(pathDir.path()));
  
      EnvVarGuard pathGuard("PATH");
@@ -256,7 +256,7 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
      QTRY_COMPARE_WITH_TIMEOUT(failedSpy.count(), 1, 5000);
      QVERIFY(!backend.busy());
      QVERIFY(backend.status().isEmpty());
-@@ -1242,7 +1346,7 @@ void BackendTests::failedExportPreservesExistingFile() {
+@@ -1455,7 +1559,7 @@ void BackendTests::failedExportPreservesExistingFile() {
      QVERIFY(installBrokenFfmpeg(pathDir.path()));
  
      EnvVarGuard pathGuard("PATH");
@@ -265,3 +265,31 @@ index 9f1dbe0ce5a08e72d1ae5388f890da8dfc4882a4..0a14b7a8a9e2364286137d89df5f8eee
  
      backend.exportClips(QUrl::fromLocalFile(outPath), wholeVideo(1.0));
      QTRY_COMPARE_WITH_TIMEOUT(failedSpy.count(), 1, 5000);
+@@ -2843,6 +2947,11 @@ void BackendTests::themeFollowsOmarchyInstalledLater() {
+ }
+ 
+ void BackendTests::themeFollowsASymlinkSwitch() {
++#ifdef Q_OS_WIN
++    QSKIP("Omarchy switches themes by renaming one symlink over another. On Windows "
++          "QFile::link makes a .lnk shortcut, a real directory symlink needs privileges, "
++          "and no rename replaces a directory link");
++#endif
+     // A theme switch that swaps current/theme as a symlink between two theme
+     // directories, then an edit to the newly linked theme.
+     QTemporaryDir dir;
+@@ -2869,9 +2978,15 @@ void BackendTests::themeFollowsASymlinkSwitch() {
+ void BackendTests::themeFollowsHyprlandRounding() {
+     QTemporaryDir dir;
+     const QString response = dir.filePath(QStringLiteral("response.json"));
++#ifdef Q_OS_WIN
++    // Windows starts no #! script; a batch file is the same fake there.
++    const QString command = dir.filePath(QStringLiteral("hyprctl.cmd"));
++    QVERIFY(writeFile(command, "@type \"" + QDir::toNativeSeparators(response).toUtf8() + "\"\r\n"));
++#else
+     const QString command = dir.filePath(QStringLiteral("hyprctl"));
+     QVERIFY(writeFile(command, "#!/bin/sh\ncat '" + response.toUtf8() + "'\n"));
+     QVERIFY(QFile::setPermissions(command, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
++#endif
+     QVERIFY(writeFile(response, "{\"int\":0}"));
+ 
+     Theme theme(dir.path(), nullptr, command);
