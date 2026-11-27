@@ -56,6 +56,12 @@ $configure = @(
     "-DCMAKE_PROJECT_INCLUDE=$hook"
 )
 if ($QtDir) { $configure += "-DCMAKE_PREFIX_PATH=$QtDir" }
+if ($IsMacOS) {
+    # The experimental macOS build is Apple silicon only, and runs where Qt
+    # 6.8 does. Both have to be set at configure time: the hook runs after
+    # project(), too late for either.
+    $configure += '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0'
+}
 
 & cmake @configure
 if ($LASTEXITCODE -ne 0) { throw "cmake configure failed ($LASTEXITCODE)" }

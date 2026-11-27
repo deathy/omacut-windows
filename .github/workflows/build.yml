@@ -90,3 +90,94 @@ jobs:
           name: omacut-win64
           path: dist/*.zip
           if-no-files-found: error
+
+  # Experimental: the same port, built as an Apple silicon .app. Nothing in
+  # the source is macOS-specific; this is packaging and CI only. See PORT.md,
+  # "macOS".
+  macos:
+    # Not macos-latest: Qt 6.8.1 supports the macOS 15 SDK, and its headers
+    # stop compiling under Xcode 26 (qyieldcpu.h calls an undeclared
+    # __yield). Moving off 6.8.1 would mean leaving the Qt the Windows build
+    # and patches 6 and 7 are written against.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use the Xcode Qt 6.8.1 supports
+        run: |
+          xcode="$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          if [ -z "$xcode" ]; then echo "No Xcode 16 on this runner"; ls -d /Applications/Xcode*; exit 1; fi
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Prepare source
+        shell: pwsh
+        run: ./bin/prepare-source.ps1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.1'
+          host: mac
+          target: desktop
+          arch: clang_64
+          modules: qtmultimedia
+          cache: true
+
+      # Through bin/build-cmake.ps1, like Windows; the port hook makes it an
+      # omacut.app here. The app alone first, so that it is packaged and
+      # uploaded even if a test suite fails to compile.
+      - name: Build omacut
+        run: |
+          command -v ninja >/dev/null || brew install ninja
+          pwsh -File bin/build-cmake.ps1 -Target omacut
+
+      - name: Package
+        run: pwsh -File bin/package-macos.ps1 -Version "ci-${GITHUB_SHA::7}"
+
+      # Uploaded before the tests run, unlike on Windows: while this build is
+      # an experiment, a test that fails on macOS for reasons of its own
+      # should not cost the app to try by hand. The job still goes red.
+      - name: Upload build
+        uses: actions/upload-artifact@v7
+        with:
+          name: omacut-macos-arm64
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: Build tests
+        run: pwsh -File bin/build-cmake.ps1
+
+      # The backend tests shell out to a real ffmpeg. Use the one just
+      # bundled into the app, so the tests run against what ships.
+      - name: Put the bundled ffmpeg on the PATH
+        run: |
+          dir="$(echo "$GITHUB_WORKSPACE"/dist/omacut-*-macos-arm64/omacut.app/Contents/MacOS)"
+          "$dir/ffmpeg" -hide_banner -version | head -1
+          echo "$dir" >> "$GITHUB_PATH"
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          failed=""
+          for suite in omacut_tests dialogfilepicker_tests; do
+            echo "== $suite =="
+            "build/$suite" || failed="$failed $suite"
+          done
+          if [ -n "$failed" ]; then
+            # The pixel-comparing tests save what they saw to the temp
+            # folder, which goes with the runner. Keep it for the upload below.
+            mkdir -p test-images
+            find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'omacut-*.png' -exec cp {} test-images/ \; || true
+            echo "Failing suites:$failed"
+            exit 1
+          fi
+
+      - name: Upload what failing tests saw
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: omacut-macos-test-images
+          path: test-images/
+          if-no-files-found: ignore

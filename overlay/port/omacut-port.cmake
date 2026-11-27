@@ -1,6 +1,6 @@
 # What the port changes in upstream's build, applied from outside so that
-# upstream's CMakeLists.txt never needs patching. See PORT.md, "File picker"
-# and "Windows executable metadata".
+# upstream's CMakeLists.txt never needs patching. See PORT.md, "File picker",
+# "Windows executable metadata" and "macOS".
 #
 # The build passes this file as CMAKE_PROJECT_INCLUDE, so CMake runs it right
 # after upstream's project() call, before any target exists. It finds what the
@@ -111,6 +111,37 @@ BEGIN
 END
 ]])
         target_sources(omacut PRIVATE "${CMAKE_BINARY_DIR}/omacut.rc")
+    endif()
+
+    if(APPLE)
+        # The experimental macOS build: omacut.app rather than a bare
+        # executable, with its icon and an Info.plist of its own. CMake's
+        # default plist has no minimum macOS version and does not ask for
+        # Retina rendering, so this one says both.
+        set(icns "${CMAKE_SOURCE_DIR}/pkgbuild/omacut.icns")
+        set_source_files_properties("${icns}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+        target_sources(omacut PRIVATE "${icns}")
+        file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/Info.plist" @ONLY CONTENT [[
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>     <string>en</string>
+    <key>CFBundleExecutable</key>            <string>omacut</string>
+    <key>CFBundleIconFile</key>              <string>omacut.icns</string>
+    <key>CFBundleIdentifier</key>            <string>io.github.deathy.omacut</string>
+    <key>CFBundleInfoDictionaryVersion</key> <string>6.0</string>
+    <key>CFBundleName</key>                  <string>omacut</string>
+    <key>CFBundlePackageType</key>           <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>        <string>12.0</string>
+    <key>NSHighResolutionCapable</key>       <true/>
+    <key>NSPrincipalClass</key>              <string>NSApplication</string>
+</dict>
+</plist>
+]])
+        set_target_properties(omacut PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_BINARY_DIR}/Info.plist")
     endif()
 endfunction()
 

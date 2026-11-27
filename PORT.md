@@ -311,8 +311,12 @@ port builds with, and some of its tests use what only the newer Qt has:
   was any more, while the scene itself matched the fresh editor's.
 
 **What.** Pass `dropUrls()`'s point as a `QPoint`; it is a whole pixel
-anyway. In `EditorUnderTest::view()`, hide and show the bar just before the
-grab, which rebuilds its scene graph nodes. What either test asserts does not
+anyway. In `EditorUnderTest::view()`, just before the grab, hide the bar,
+grab the window once, and show the bar again, which rebuilds its scene graph
+nodes. The throwaway grab is what makes that certain: it renders a frame
+while the bar is hidden. A fixed wait there instead (20 ms, the first
+version of this) was usually enough on Windows but not on the slower macOS
+runner, where the stale frame then failed a different seed on each run. What either test asserts does not
 change. As with section 5, adapt tests like these rather than the code under
 test.
 
@@ -326,6 +330,42 @@ tests pass without each part, and drop what is no longer needed.
 (`WIN32_EXECUTABLE`, or Windows opens a console beside it) and gives it its
 icon and version-info strings through a generated `omacut.rc`. Nothing in
 upstream's files changes.
+
+### 11. macOS (experimental)
+
+*Overlay only:* the `if(APPLE)` block in `port/omacut-port.cmake` and
+`pkgbuild/omacut.icns`. *Build:* the `$IsMacOS` lines in
+`bin/build-cmake.ps1`. *Packaging:* `bin/fetch-ffmpeg-macos.ps1`,
+`bin/package-macos.ps1`, the `macos` job in `.github/workflows/build.yml`.
+
+**Why.** Nothing in sections 1 to 9 is Windows-only in effect: each is either
+guarded by `Q_OS_WIN`/`Q_OS_LINUX` or holds on any non-Linux desktop. The
+QFileDialog picker shows the native macOS panels, `toolPath()` finds ffmpeg in
+`Contents/MacOS` (the `applicationDirPath()` of an app bundle), and the
+hardware decoder list is left to Qt, which means VideoToolbox. So a macOS
+build is packaging and nothing more, and stays that way: **no patch is
+macOS-specific**. If one ever has to be, say so here first.
+
+**What.** The `if(APPLE)` block builds `omacut` as `omacut.app`
+(`MACOSX_BUNDLE`; upstream's target is a bare executable) with the icon and
+an `Info.plist` that names the identifier, the minimum macOS (12, as for
+Qt 6.8) and Retina rendering, none of which CMake's default plist does.
+`build-cmake.ps1` sets the architecture (arm64) and deployment target on
+macOS, because both must be known before `project()`, and the hook runs
+after it. `omacut.icns` is upstream's `pkgbuild/omacut.svg` drawn at 880 px on a
+1024 px canvas, which puts the icon's body on the size Apple's icon grid
+expects (824 px) so that it sits right next to other apps in the Dock.
+`package-macos.ps1` runs `macdeployqt`, adds Martin Riedl's static arm64
+ffmpeg and ffprobe (pinned by hash; they link only system frameworks),
+checks that every Mach-O file in the bundle loads only the OS and the
+bundle, signs it ad hoc, and starts it offscreen for a few seconds before
+zipping it with `ditto`. CI uploads that zip before running the test suites,
+so a macOS-only test failure does not cost the app.
+
+Apple silicon only, and not released: there is no `macos` job in
+`release.yml` yet. Before adding one, try a CI build on a real Mac the way
+the checklist below says for Windows, including that the export quality
+choices show in the save panel's format popup.
 
 ### Not changes, but differences users see
 

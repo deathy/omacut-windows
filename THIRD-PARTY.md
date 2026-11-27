@@ -47,3 +47,19 @@ omacut's own terms therefore stay MIT.
 If you would rather not have the bundled copy, delete `ffmpeg.exe`,
 `ffprobe.exe` and the `av*`/`sw*` DLLs — omacut falls back to whatever `ffmpeg`
 and `ffprobe` it finds on your `PATH`.
+
+## The experimental macOS build
+
+The same terms apply, with these differences. This file and the licences are
+in `omacut.app/Contents/Resources`.
+
+- **Qt** is the `Qt*.framework` folders under `Contents/Frameworks` and the
+  `Contents/PlugIns` folder, dynamically linked and unmodified. To replace it,
+  swap in your own builds of the same frameworks, or rebuild omacut against
+  your own Qt (see `README.md`). Replacing a framework breaks the app's ad hoc
+  signature; re-sign it with `codesign --force --deep --sign - omacut.app`.
+- **ffmpeg** is `Contents/MacOS/ffmpeg` and `ffprobe`: static GPL v3 builds
+  from <https://ffmpeg.martin-riedl.de>, built with the scripts at
+  <https://git.martin-riedl.de/ffmpeg/build-script>. Exact build and SHA256:
+  `Contents/Resources/FFMPEG-BUILD.txt`. Full licence text: `GPL-3.0.txt`.
+- There is no Visual C++ runtime; the C++ runtime is the one macOS ships.
