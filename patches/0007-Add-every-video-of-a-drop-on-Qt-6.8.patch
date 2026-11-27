@@ -19,10 +19,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 3760a16130fc09768a8c123dedb6f1c763063d7c..482293a4dc28070616bbb0f98bc98d78f98888c3 100644
+index 7ea31babae56e3fcabc6cb0b4c53af28079dcb37..8b06bec43a0def43bd457d5ade320a4649552112 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -254,7 +254,11 @@ bool Backend::addVideos(const QVariantList &urls, double t) {
+@@ -295,7 +295,11 @@ bool Backend::addVideos(const QVariantList &urls, double t) {
      int queued = 0;
      for (const QVariant &value : urls) {
          PendingVideo pending;
