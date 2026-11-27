@@ -17,10 +17,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 14 insertions(+)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 2d8091d5819b671024f2f38c13a74573b97a6f56..2aa84186e7253cb698d369551a20b323536335e2 100644
+index c75787392eefffc7232229b4c27a030e16db0895..95a091b7d196b77c77f285bb70fbd460e39f68e8 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -16,6 +16,10 @@
+@@ -17,6 +17,10 @@
  #include <memory>
  #include <utility>
  
@@ -31,7 +31,7 @@ index 2d8091d5819b671024f2f38c13a74573b97a6f56..2aa84186e7253cb698d369551a20b323
  #include "filepicker.h"
  #include "dialogfilepicker.h"
  #include "thumbprovider.h"
-@@ -33,9 +37,19 @@ QString mp4PathFor(const QString &path) {
+@@ -34,9 +38,19 @@ QString mp4PathFor(const QString &path) {
  }
  
  bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
@@ -49,5 +49,5 @@ index 2d8091d5819b671024f2f38c13a74573b97a6f56..2aa84186e7253cb698d369551a20b323
      return std::rename(tmpName.constData(), outName.constData()) == 0;
 +#endif
  }
- }
  
+ // Rejects non-local schemes, relative paths (which ffprobe could read as

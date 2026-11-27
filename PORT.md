@@ -207,11 +207,21 @@ a named pipe (`CreateNamedPipeW`) that never sends a byte. The test then
 waits until ffmpeg has opened the pipe (`GetNamedPipeClientProcessId`)
 before timing the stop. The patch wraps this in a `SilentPipe` helper in
 `tests/omacut_tests.cpp`, which `thumbProviderCancelsRunningJobs` uses the
-same way. `probeRunsOffTheUiThread` uses it for a slow ffprobe: where the
-fake sleeps two seconds and exits, the test holds ffprobe on the pipe for
-two seconds, checks that nothing has finished yet, and then closes the pipe
-so that the probe fails. Use `SilentPipe` for any future test that needs a
-hung or slow ffmpeg or ffprobe.
+same way. Use `SilentPipe` for any future test that needs a hung or slow
+ffmpeg or ffprobe, where the test chooses what the tool reads.
+
+Where it can't, fake the tool with a batch file, as the `hyprctl.cmd` does.
+`toolPath()` finds a `.cmd` on the PATH. Since v0.8.4, `Backend` opens no
+`\\.\pipe\...` path, and an export reads the loaded video, so three tests
+use batch files:
+
+- `probeRunsOffTheUiThread`'s `ffprobe.cmd` waits two seconds (`ping`, named
+  in full because the test's PATH holds only the fake) and exits without
+  output, as upstream's fake does. Halfway through, the test checks that the
+  probe is still running, so a fake that never started can't pass it.
+- `destroyingBackendMidExportStopsProcessCleanly`'s `ffmpeg.cmd` loops in
+  place (`goto`), so killing it leaves no child process behind.
+- `probeFallsBackPastNaDuration`'s `ffprobe.cmd` `echo`es upstream's JSON.
 
 ### 6. Play videos whose names need escaping
 
@@ -322,6 +332,11 @@ upstream's files changes.
 - The accent colour is upstream's default amber. Upstream reads it from the
   Omarchy theme and falls back to the default when there is none, which on
   Windows is always. No code is involved.
+- Since v0.8.4, upstream opens and exports only paths with no host
+  (`isLocalAbsolutePath()` in `src/backend.cpp`), so that ffprobe and ffmpeg
+  are never handed a network address. On Windows that also refuses UNC paths
+  (`\\server\share\...`); a share mapped to a drive letter works. The port
+  keeps upstream's behaviour.
 - Packaging (Qt runtime, MSVC runtime, ffmpeg, licences, zip) lives entirely
   in `bin/` and `.github/` and never touches the source tree.
 

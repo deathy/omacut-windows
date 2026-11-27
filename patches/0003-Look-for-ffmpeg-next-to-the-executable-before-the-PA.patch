@@ -15,10 +15,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  1 file changed, 8 insertions(+)
 
 diff --git a/src/ffmpeg.cpp b/src/ffmpeg.cpp
-index cb09be992b35a6272a7ce22c5f24bc7e38cafcf5..057c82d0cc8d69d1384b98a62a8f3736e7313be1 100644
+index bdf6d090a4d7280c94c77b35a3a92c8f743293a0..09e2d58b9ab1d5909a2e4e8ef14a646f24aab429 100644
 --- a/src/ffmpeg.cpp
 +++ b/src/ffmpeg.cpp
-@@ -69,6 +69,14 @@ double probePacketDuration(const QString &ffprobe, const QString &path, int stre
+@@ -101,6 +101,14 @@ bool parseFiniteDouble(const QJsonValue &value, double *out) {
  }
  
  QString toolPath(const QString &tool) {

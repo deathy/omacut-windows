@@ -27,10 +27,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
  3 files changed, 16 insertions(+), 4 deletions(-)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 91f181d22d870ce6a520f67e4a67e02d014f0f8f..2d8091d5819b671024f2f38c13a74573b97a6f56 100644
+index 6c7338892b5b5d4ee7b5cf9af7c8c4dc3afbd49a..c75787392eefffc7232229b4c27a030e16db0895 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -17,7 +17,7 @@
+@@ -18,7 +18,7 @@
  #include <utility>
  
  #include "filepicker.h"
@@ -39,7 +39,7 @@ index 91f181d22d870ce6a520f67e4a67e02d014f0f8f..2d8091d5819b671024f2f38c13a74573
  #include "thumbprovider.h"
  
  namespace {
-@@ -40,7 +40,7 @@ bool replaceWithTemp(const QString &tmpPath, const QString &outPath) {
+@@ -73,7 +73,7 @@ double resolveStepTarget(const QList<double> &times, const edit::Clip &clip,
  }
  
  Backend::Backend(ThumbProvider *provider, QObject *parent)
@@ -72,7 +72,7 @@ index 8fbeb2380d8fbe3f46c4470849fad9377e33d98e..a185c850664c3606a5e83eecd797cc95
  
      // Associates the window with omacut.desktop so the compositor (Wayland app_id
 diff --git a/tests/omacut_tests.cpp b/tests/omacut_tests.cpp
-index 7bb3f1b458e627ce1a081a1a11434f3ecbd5ac9f..7aa16d1578c3b8d3ddd84ee8bcc2fc09a1334e37 100644
+index 0ce944e5dcb6dde8757ff2e2b49143901b6623a9..3f8b0c37d9b081e9a431b4175834955fa5e5a19e 100644
 --- a/tests/omacut_tests.cpp
 +++ b/tests/omacut_tests.cpp
 @@ -1,9 +1,11 @@
@@ -110,7 +110,7 @@ index 7bb3f1b458e627ce1a081a1a11434f3ecbd5ac9f..7aa16d1578c3b8d3ddd84ee8bcc2fc09
  
  class FakeFilePicker : public FilePicker {
      Q_OBJECT
-@@ -3291,6 +3297,9 @@ void BackendTests::qmlDropTakesOnlyLocalFiles() {
+@@ -3530,6 +3536,9 @@ void BackendTests::qmlDropTakesOnlyLocalFiles() {
  }
  
  void BackendTests::portalPickerReplacesAnUnansweredRequest() {
@@ -120,7 +120,7 @@ index 7bb3f1b458e627ce1a081a1a11434f3ecbd5ac9f..7aa16d1578c3b8d3ddd84ee8bcc2fc09
      // The picker talks to whatever DBUS_SESSION_BUS_ADDRESS named when this
      // process first touched the session bus, and by the time a test runs
      // that is the real bus, where a real portal owns the name. So the
-@@ -3377,6 +3386,7 @@ void BackendTests::portalPickerReplacesAnUnansweredRequest() {
+@@ -3624,6 +3633,7 @@ void BackendTests::portalPickerReplacesAnUnansweredRequest() {
          QStringLiteral("/org/freedesktop/portal/desktop"));
      QDBusConnection::sessionBus().unregisterService(
          QStringLiteral("org.freedesktop.portal.Desktop"));
