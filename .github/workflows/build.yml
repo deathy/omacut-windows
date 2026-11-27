@@ -165,4 +165,19 @@ jobs:
             echo "== $suite =="
             "build/$suite" || failed="$failed $suite"
           done
-          if [ -n "$failed" ]; then echo "Failing suites:$failed"; exit 1; fi
+          if [ -n "$failed" ]; then
+            # The pixel-comparing tests save what they saw to the temp
+            # folder, which goes with the runner. Keep it for the upload below.
+            mkdir -p test-images
+            find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'omacut-*.png' -exec cp {} test-images/ \; || true
+            echo "Failing suites:$failed"
+            exit 1
+          fi
+
+      - name: Upload what failing tests saw
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: omacut-macos-test-images
+          path: test-images/
+          if-no-files-found: ignore
