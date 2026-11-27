@@ -60,21 +60,11 @@ jobs:
           "upstream=$upstream" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Building $version from $tag (prerelease: $pre, upstream: $upstream)"
 
-      - name: Build omacut
+      - name: Build omacut and the tests
         shell: cmd
         run: |
           call "%VCVARS%" || exit /b 1
-          mkdir build && cd build
-          qmake "%GITHUB_WORKSPACE%\work\omacut-windows.pro" || exit /b 1
-          nmake || exit /b 1
-
-      - name: Build and run tests
-        shell: cmd
-        run: |
-          call "%VCVARS%" || exit /b 1
-          mkdir build-tests && cd build-tests
-          qmake "%GITHUB_WORKSPACE%\work\tests\backend_tests-windows.pro" || exit /b 1
-          nmake || exit /b 1
+          pwsh -File bin/build-cmake.ps1 || exit /b 1
 
       - name: Install ffmpeg for the test run
         shell: pwsh
@@ -85,20 +75,18 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          # Never publish a release whose own test suite does not pass.
-          $exe = Get-ChildItem -Path build-tests -Recurse -File -Filter 'backend_tests.exe' |
-                 Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if (-not $exe) { throw 'No test binary was built' }
-          # QtTest's stdout arrives empty on the Windows runner; its own file
-          # logger is the way to see results.
-          $log = Join-Path $PWD 'backend_tests.txt'
-          Push-Location build-tests
-          try {
-            & $exe.FullName -o "$log,txt"
+          # Never publish a release whose own test suites do not pass.
+          foreach ($suite in 'omacut_tests', 'dialogfilepicker_tests') {
+            $exe = Join-Path build "$suite.exe"
+            if (-not (Test-Path $exe)) { throw "No $suite.exe was built" }
+            # QtTest's stdout arrives empty on the Windows runner; its own file
+            # logger is the way to see results.
+            $log = Join-Path $PWD "$suite.txt"
+            & $exe -o "$log,txt"
             $code = $LASTEXITCODE
-          } finally { Pop-Location }
-          if (Test-Path $log) { Get-Content $log | ForEach-Object { Write-Host $_ } }
-          if ($code -ne 0) { throw 'Tests failed -- not releasing' }
+            if (Test-Path $log) { Get-Content $log | ForEach-Object { Write-Host $_ } }
+            if ($code -ne 0) { throw "$suite failed -- not releasing" }
+          }
 
       # Through cmd so vcvars is in scope: packaging copies the Visual C++
       # runtime, and only the MSVC environment says where it lives.

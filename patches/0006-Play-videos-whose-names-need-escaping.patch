@@ -18,15 +18,15 @@ Main.qml's player.source = url assignments take text just as well.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
- src/backend.cpp         |  7 ++++++-
- tests/backend_tests.cpp | 30 ++++++++++++++++++++++++++++++
+ src/backend.cpp        |  7 ++++++-
+ tests/omacut_tests.cpp | 30 ++++++++++++++++++++++++++++++
  2 files changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/src/backend.cpp b/src/backend.cpp
-index 86da2edc358f23ecaa9e85fd65cd42c224ff844b..d831ee4c0cb76a87d72637db5de86353ddff16d6 100644
+index 95a091b7d196b77c77f285bb70fbd460e39f68e8..7ea31babae56e3fcabc6cb0b4c53af28079dcb37 100644
 --- a/src/backend.cpp
 +++ b/src/backend.cpp
-@@ -203,8 +203,13 @@ bool Backend::isVideoPath(const QString &path) const {
+@@ -151,8 +151,13 @@ bool Backend::isVideoPath(const QString &path) const {
  
  QVariantList Backend::videoList() const {
      QVariantList result;
@@ -41,12 +41,12 @@ index 86da2edc358f23ecaa9e85fd65cd42c224ff844b..d831ee4c0cb76a87d72637db5de86353
                                    {QStringLiteral("thumbKey"), video.thumbKey}});
      return result;
  }
-diff --git a/tests/backend_tests.cpp b/tests/backend_tests.cpp
-index 0a14b7a8a9e2364286137d89df5f8eee29794478..d3a507d1bbe9cc8914572c37c84e411abd285f81 100644
---- a/tests/backend_tests.cpp
-+++ b/tests/backend_tests.cpp
-@@ -27,6 +27,8 @@
- 
+diff --git a/tests/omacut_tests.cpp b/tests/omacut_tests.cpp
+index 6a7262b25771d07fe191265ddb9f6efe44318cd3..41512de2daaa46f3f3ae14aa953d05930e1bf661 100644
+--- a/tests/omacut_tests.cpp
++++ b/tests/omacut_tests.cpp
+@@ -34,6 +34,8 @@
+ #include <cstdio>
  #include <memory>
  
 +#include <QMediaPlayer>
@@ -54,15 +54,15 @@ index 0a14b7a8a9e2364286137d89df5f8eee29794478..d3a507d1bbe9cc8914572c37c84e411a
  #ifdef Q_OS_WIN
  #include <QUuid>
  #define NOMINMAX
-@@ -295,6 +297,7 @@ private slots:
-     void exportStartFailureClearsBusy();
+@@ -373,6 +375,7 @@ private slots:
      void failedExportPreservesExistingFile();
+     void destroyingBackendMidExportStopsProcessCleanly();
      void qmlDoesNotCreateAudioOutputWithoutVideo();
 +    void qmlPlaysVideosWhoseNamesNeedEscaping();
      void qmlShortcutsTriggerBackendActions();
      void qmlArrowKeysMoveThePlayhead();
-     void qmlNumberKeysJumpThroughTheEdit();
-@@ -1367,6 +1370,33 @@ void BackendTests::qmlDoesNotCreateAudioOutputWithoutVideo() {
+     void qmlFrameStepsSurviveRoundedPlayerFeedback();
+@@ -1725,6 +1728,33 @@ void BackendTests::qmlDoesNotCreateAudioOutputWithoutVideo() {
      QCOMPARE(harness.window()->property("audioOutputReady").toBool(), false);
  }
  

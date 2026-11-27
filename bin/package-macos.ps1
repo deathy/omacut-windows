@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     The macOS counterpart of package-windows.ps1, for the experimental macOS
-    build (Apple silicon only). Takes the omacut.app qmake built, puts the Qt
+    build (Apple silicon only). Takes the omacut.app bin/build-cmake.ps1 built, puts the Qt
     runtime inside it (macdeployqt), adds a bundled ffmpeg and the licences,
     signs it ad hoc, checks that nothing in it still points outside the
     bundle, and zips it with ditto -- which, unlike Compress-Archive, keeps the

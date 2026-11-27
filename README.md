@@ -55,8 +55,9 @@ changes.
 ## Building it yourself
 
 You need [Qt 6](https://www.qt.io/download-qt-installer) (with the Qt Multimedia
-module), MSVC, git and PowerShell 7. From an *x64 Native Tools Command Prompt
-for VS*:
+module), MSVC with its CMake tools (part of Visual Studio's *Desktop development
+with C++*, and they bring Ninja too), git and PowerShell 7. From an *x64 Native
+Tools Command Prompt for VS*:
 
 ```powershell
 pwsh -File bin\build-windows.ps1 -QtDir C:\Qt\6.8.1\msvc2022_64
@@ -77,9 +78,9 @@ The port also builds on macOS, which is a way to check it without a Windows
 machine in the loop:
 
 ```sh
-brew install qtbase qtdeclarative qtmultimedia powershell
+brew install qtbase qtdeclarative qtmultimedia cmake ninja powershell
 pwsh -File bin/prepare-source.ps1
-mkdir -p build && cd build && qmake ../work/omacut-windows.pro && make
+pwsh -File bin/build-cmake.ps1
 ```
 
 ## macOS (experimental)

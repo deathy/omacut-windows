@@ -7,12 +7,15 @@ port adds or changes. The source that gets compiled is assembled at build time:
 upstream omacut @ UPSTREAM_VERSION      https://github.com/omacom/omacut
   + overlay/                            files the port adds, copied in as-is
   + patches/*.patch                     the port's edits to upstream's files
-  = work/                               what qmake builds (ignored by git)
+  = work/                               what CMake builds (ignored by git)
 ```
 
 `bin/prepare-source.ps1` does the assembling; `bin/export-patches.ps1` turns
 edits made in `work/` back into `patches/`. Both are PowerShell 7 and run the
-same on Windows, Linux and macOS.
+same on Windows, Linux and macOS. `bin/build-cmake.ps1` builds `work/` with
+upstream's `CMakeLists.txt`, adjusted from outside by
+`overlay/port/omacut-port.cmake` (see below); CI, releases and the local
+scripts all build through it.
 
 ## What is ours and what is upstream's
 
@@ -31,10 +34,13 @@ Ground rules that keep it that way:
   `export-patches.ps1` refuses a patch that adds a file, and
   `prepare-source.ps1` refuses an overlay file that would overwrite one of
   upstream's.
-- **Prefer adjusting from outside to patching.** The `.pro` files are the
-  example: `overlay/omacut-windows.pro` does `include(omacut.pro)` and then
-  removes and adds sources, so upstream's project file is never touched. Only
-  what cannot be reached from outside belongs in a patch.
+- **Prefer adjusting from outside to patching.** The build is the example:
+  `overlay/port/omacut-port.cmake` is passed to CMake as
+  `CMAKE_PROJECT_INCLUDE`, which runs it right after upstream's `project()`.
+  It defers its adjustments (`cmake_language(DEFER)`) to the end of
+  upstream's `CMakeLists.txt` and then changes upstream's targets in place,
+  so upstream's build file is never touched. Only what cannot be reached from
+  outside belongs in a patch.
 - **Keep patches small and one concern each**, and keep each one matching its
   section below. Every patch is one more place upstream can conflict.
 - **Never fix things in `work/` and stop there.** `prepare-source.ps1` rebuilds
@@ -49,8 +55,8 @@ things up by the identifiers named, not by line numbers.
 
 ### 1. File picker: QFileDialog instead of the desktop portal
 
-*Overlay:* `src/dialogfilepicker.{h,cpp}`, `omacut-windows.pro`,
-`tests/backend_tests-windows.pro`, `tests/dialogfilepicker_tests.{cpp,pro}`.
+*Overlay:* `src/dialogfilepicker.{h,cpp}`, `tests/dialogfilepicker_tests.cpp`,
+`port/omacut-port.cmake`.
 *Patch:* `Pick files with QFileDialog instead of the desktop portal`.
 
 **Why.** Upstream opens and saves files through xdg-desktop-portal over D-Bus
@@ -84,7 +90,8 @@ the native Windows dialogs:
 - `src/main.cpp`: `QFileDialog` is a widget, so the application object must be
   a `QApplication`, not a `QGuiApplication`. Change both the include and the
   object.
-- `tests/backend_tests.cpp`: upstream tests `PortalFilePicker` itself
+- `tests/omacut_tests.cpp` (`backend_tests.cpp` before v0.8.0): upstream tests
+  `PortalFilePicker` itself
   (`portalPickerReplacesAnUnansweredRequest`, since v0.7.2), against a fake
   portal on a private D-Bus. The Windows test build has neither the picker
   nor D-Bus, so everything that needs them (the `QDBus*` and
@@ -92,13 +99,22 @@ the native Windows dialogs:
   the test's body) goes under `#ifndef OMACUT_NO_PORTAL_PICKER`, and the test
   `QSKIP`s with the reason instead. Do the same for any later portal test.
 
-**From outside** (overlay, no patch): `omacut-windows.pro` and
-`tests/backend_tests-windows.pro` include upstream's project files, then swap
-`portalfilepicker.*` and the `dbus` module for `dialogfilepicker.*` and
-`widgets`. They stop with an error if upstream's project file no longer lists
-`portalfilepicker.cpp`, because otherwise the `-=` would quietly do nothing.
-`backend_tests-windows.pro` also defines `OMACUT_NO_PORTAL_PICKER`, which
-the test patch above keys on.
+**From outside** (overlay, no patch): upstream's `CMakeLists.txt` globs
+`src/`, so the overlay's `dialogfilepicker.*` land in its `omacut_core`
+library on their own, and so does `portalfilepicker.*`.
+`port/omacut-port.cmake` takes `portalfilepicker.*` back out of
+`omacut_core`, swaps `Qt6::DBus` for `Qt6::Widgets` in what it links, defines
+`OMACUT_NO_PORTAL_PICKER` for `omacut_tests` (which the test patch above keys
+on), and adds the `dialogfilepicker_tests` target. It stops with an error if
+`omacut_core` no longer builds `portalfilepicker.cpp`, or if any of
+`omacut_core`, `omacut` and `omacut_tests` is gone, because otherwise its
+changes would quietly do nothing.
+
+The same file also fits upstream's GCC flags to MSVC: it drops the `-W*`
+options (MSVC reads `-Wall` as `/Wall`, which floods the build with warnings
+from Qt's headers) for `/W3 /utf-8`. `bin/build-cmake.ps1` passes
+`CMAKE_BUILD_TYPE=Release` itself: upstream defaults to Release only when no
+build type is set, and CMake sets Debug on its own for MSVC.
 
 **Still right when:** the build has no D-Bus dependency, and
 `dialogfilepicker_tests` passes.
@@ -162,13 +178,20 @@ with the code under test:
   nothing about shebangs;
 - expecting a failed process start to be reported asynchronously.
   `CreateProcess` fails inline, so `errorOccurred` has already fired by the
-  time the call returns.
+  time the call returns;
+- symlinks made with `QFile::link`, which on Windows makes a `.lnk` shortcut
+  instead.
 
 **What.** Adapt the tests, never the code under test, and keep what each test
 asserts. For example, the broken fake on Windows is an `ffmpeg.exe` that holds
-no valid executable image, and an assertion that only holds where failures
-are asynchronous goes under `#ifndef Q_OS_WIN`. Only if a test truly cannot
-be expressed on Windows, `QSKIP` it there with the reason. Do not delete it.
+no valid executable image, the fake `hyprctl` in
+`themeFollowsHyprlandRounding` is a `hyprctl.cmd` that `type`s its answer, and
+an assertion that only holds where failures are asynchronous goes under
+`#ifndef Q_OS_WIN`. Only if a test truly cannot be expressed on Windows,
+`QSKIP` it there with the reason. Do not delete it.
+`themeFollowsASymlinkSwitch` is one: Omarchy switches themes by renaming one
+symlink over another, and Windows has neither unprivileged directory symlinks
+nor a rename that replaces one.
 
 **Upstream adds tests of this kind regularly**, so check every new upstream
 version for more (see the checklist below), even when every patch applies
@@ -183,12 +206,22 @@ PATH. On Windows the port now hangs the *real* ffmpeg instead: its input is
 a named pipe (`CreateNamedPipeW`) that never sends a byte. The test then
 waits until ffmpeg has opened the pipe (`GetNamedPipeClientProcessId`)
 before timing the stop. The patch wraps this in a `SilentPipe` helper in
-`tests/backend_tests.cpp`, which `thumbProviderCancelsRunningJobs` uses the
-same way. `probeRunsOffTheUiThread` uses it for a slow ffprobe: where the
-fake sleeps two seconds and exits, the test holds ffprobe on the pipe for
-two seconds, checks that nothing has finished yet, and then closes the pipe
-so that the probe fails. Use `SilentPipe` for any future test that needs a
-hung or slow ffmpeg or ffprobe.
+`tests/omacut_tests.cpp`, which `thumbProviderCancelsRunningJobs` uses the
+same way. Use `SilentPipe` for any future test that needs a hung or slow
+ffmpeg or ffprobe, where the test chooses what the tool reads.
+
+Where it can't, fake the tool with a batch file, as the `hyprctl.cmd` does.
+`toolPath()` finds a `.cmd` on the PATH. Since v0.8.4, `Backend` opens no
+`\\.\pipe\...` path, and an export reads the loaded video, so three tests
+use batch files:
+
+- `probeRunsOffTheUiThread`'s `ffprobe.cmd` waits two seconds (`ping`, named
+  in full because the test's PATH holds only the fake) and exits without
+  output, as upstream's fake does. Halfway through, the test checks that the
+  probe is still running, so a fake that never started can't pass it.
+- `destroyingBackendMidExportStopsProcessCleanly`'s `ffmpeg.cmd` loops in
+  place (`goto`), so killing it leaves no child process behind.
+- `probeFallsBackPastNaDuration`'s `ffprobe.cmd` `echo`es upstream's JSON.
 
 ### 6. Play videos whose names need escaping
 
@@ -239,19 +272,69 @@ on Windows. If upstream changes `addVideos()` to take a `QList<QUrl>` or
 unwraps the entries itself, check whether the drop tests pass without this
 patch, and drop the patch if they do.
 
-### 8. Windows executable metadata
+### 8. Let go of a replaced dialog button's letter at once
 
-*Overlay only:* the `win32 {}` block in `omacut-windows.pro` and
-`pkgbuild/omacut.ico`. Gives `omacut.exe` its icon and its version-info
-strings. Nothing in upstream's files changes.
+*Patch:* `Let go of a replaced dialog button's letter at once`.
 
-### 9. macOS (experimental)
+**Why.** Since v0.8.3, each `DialogButton` (`src/DialogButton.qml`) answers
+its underlined letter through an application-wide `Shortcut`, enabled while
+the button is visible. The quit question's buttons depend on
+`backend.exporting`, so when an export ends its `Repeater` replaces them. On
+Qt 6.8 a replaced button is destroyed but only freed on a later turn of the
+event loop, and until then its `Shortcut` stays registered and enabled. The
+old Quit button's Q and the window's own Q are then two live shortcuts on one
+key, which Qt treats as ambiguous, so neither fires: a Q pressed right after
+an export finishes quits nothing. `qmlQuitAsksWhileExporting` fails on it.
 
-*Overlay only:* the `macx {}` block in `omacut-windows.pro` and
-`pkgbuild/omacut.icns`. *Packaging:* `bin/fetch-ffmpeg-macos.ps1`,
+**What.** In `Component.onDestruction`, set the `Shortcut`'s `sequences` to
+`[]`, which takes them out of the shortcut map at once.
+
+**When to drop it.** Like sections 6 and 7, this depends on the Qt version,
+not on Windows. If upstream stops replacing the buttons, or no longer gives
+them application-wide shortcuts, check whether `qmlQuitAsksWhileExporting`
+passes without this patch, and drop it if it does.
+
+### 9. Upstream's tests on Qt 6.8
+
+*Patch:* `Run upstream's tests on Qt 6.8`.
+
+**Why.** Upstream tests against Arch's Qt, which is newer than the 6.8 the
+port builds with, and some of its tests use what only the newer Qt has:
+
+- `dropUrls()` builds a `QDragEnterEvent` from a `QPointF`, a constructor Qt
+  6.8 lacks.
+- `qmlTimelineViewDependsOnlyOnTheEdit` compares a grab of the edited bar
+  with a fresh editor's, pixel by pixel. The tests run offscreen on Qt
+  Quick's software renderer (upstream's test `main()` picks it), and on Qt
+  6.8 that renderer can keep a node from before an edit on screen until the
+  bar's geometry changes: the grab showed an accent clip frame where no clip
+  was any more, while the scene itself matched the fresh editor's.
+
+**What.** Pass `dropUrls()`'s point as a `QPoint`; it is a whole pixel
+anyway. In `EditorUnderTest::view()`, hide and show the bar just before the
+grab, which rebuilds its scene graph nodes. What either test asserts does not
+change. As with section 5, adapt tests like these rather than the code under
+test.
+
+**When to drop it.** When the port moves to a newer Qt: check whether the
+tests pass without each part, and drop what is no longer needed.
+
+### 10. Windows executable metadata
+
+*Overlay only:* the `if(WIN32)` block in `port/omacut-port.cmake` and
+`pkgbuild/omacut.ico`. Builds `omacut.exe` as a GUI-subsystem program
+(`WIN32_EXECUTABLE`, or Windows opens a console beside it) and gives it its
+icon and version-info strings through a generated `omacut.rc`. Nothing in
+upstream's files changes.
+
+### 11. macOS (experimental)
+
+*Overlay only:* the `if(APPLE)` block in `port/omacut-port.cmake` and
+`pkgbuild/omacut.icns`. *Build:* the `$IsMacOS` lines in
+`bin/build-cmake.ps1`. *Packaging:* `bin/fetch-ffmpeg-macos.ps1`,
 `bin/package-macos.ps1`, the `macos` job in `.github/workflows/build.yml`.
 
-**Why.** Nothing in sections 1 to 7 is Windows-only in effect: each is either
+**Why.** Nothing in sections 1 to 9 is Windows-only in effect: each is either
 guarded by `Q_OS_WIN`/`Q_OS_LINUX` or holds on any non-Linux desktop. The
 QFileDialog picker shows the native macOS panels, `toolPath()` finds ffmpeg in
 `Contents/MacOS` (the `applicationDirPath()` of an app bundle), and the
@@ -259,8 +342,13 @@ hardware decoder list is left to Qt, which means VideoToolbox. So a macOS
 build is packaging and nothing more, and stays that way: **no patch is
 macOS-specific**. If one ever has to be, say so here first.
 
-**What.** The `macx {}` block gives the bundle an icon and an identifier.
-`omacut.icns` is upstream's `pkgbuild/omacut.svg` drawn at 880 px on a
+**What.** The `if(APPLE)` block builds `omacut` as `omacut.app`
+(`MACOSX_BUNDLE`; upstream's target is a bare executable) with the icon and
+an `Info.plist` that names the identifier, the minimum macOS (12, as for
+Qt 6.8) and Retina rendering, none of which CMake's default plist does.
+`build-cmake.ps1` sets the architecture (arm64) and deployment target on
+macOS, because both must be known before `project()`, and the hook runs
+after it. `omacut.icns` is upstream's `pkgbuild/omacut.svg` drawn at 880 px on a
 1024 px canvas, which puts the icon's body on the size Apple's icon grid
 expects (824 px) so that it sits right next to other apps in the Dock.
 `package-macos.ps1` runs `macdeployqt`, adds Martin Riedl's static arm64
@@ -280,6 +368,11 @@ choices show in the save panel's format popup.
 - The accent colour is upstream's default amber. Upstream reads it from the
   Omarchy theme and falls back to the default when there is none, which on
   Windows is always. No code is involved.
+- Since v0.8.4, upstream opens and exports only paths with no host
+  (`isLocalAbsolutePath()` in `src/backend.cpp`), so that ffprobe and ffmpeg
+  are never handed a network address. On Windows that also refuses UNC paths
+  (`\\server\share\...`); a share mapped to a drive letter works. The port
+  keeps upstream's behaviour.
 - Packaging (Qt runtime, MSVC runtime, ffmpeg, licences, zip) lives entirely
   in `bin/` and `.github/` and never touches the source tree.
 
@@ -316,18 +409,23 @@ version done, compare it against the previous one:
 
 ```powershell
 git -C work diff <old-tag> <new-tag> --stat
-git -C work diff <old-tag> <new-tag> -- src tests '*.pro'
+git -C work diff <old-tag> <new-tag> -- src tests CMakeLists.txt
 ```
 
 and look in the new code for:
 
+- changes to `CMakeLists.txt`: renamed targets, new link libraries or
+  compiler flags, sources no longer globbed from `src/`, all of which
+  `port/omacut-port.cmake` may need to follow (section 1);
 - new uses of `std::rename`, or other POSIX-only file handling (section 2);
 - tools found by anything other than `ffmpeg::toolPath()` (section 3);
-- D-Bus, the portal, or new Linux-only sources in `omacut.pro`, and tests
-  that use either (section 1);
+- D-Bus, the portal, or new Linux-only sources in `src/`, and tests that use
+  either (section 1);
 - Linux-only environment tweaks in `main()` (section 4);
 - new tests that use `':'` in PATH, `#!` fakes, `setPermissions(ExeOwner)`,
-  `sleep`/`sh`, or that assume an asynchronous process failure (section 5);
+  `sleep`/`sh`, `QFile::link`, or that assume an asynchronous process failure
+  (section 5);
+- tests that build Qt events or call Qt APIs newer than 6.8 (section 9);
 - a `QGuiApplication` created anywhere else, which the widget picker needs to
   be a `QApplication`;
 - URLs compared as text in QML, or new `QUrl`s handed to QML inside a
@@ -351,7 +449,7 @@ Remove-Item patches/*.patch
 pwsh -File bin/prepare-source.ps1 -Ref vX.Y.Z   # upstream + overlay, no patches
 ```
 
-Then, in `work/`, carry out sections 1 to 7 against the code as it now is. Make one
+Then, in `work/`, carry out sections 1 to 9 against the code as it now is. Make one
 commit per section with a message that explains the why, as the existing
 patches do. Then run `export-patches.ps1`, update `UPSTREAM_VERSION`, and
 go through the checklist above. If upstream has reworked something so far
